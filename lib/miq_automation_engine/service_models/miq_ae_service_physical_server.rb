@@ -2,8 +2,6 @@ module MiqAeMethodService
   class MiqAeServicePhysicalServer < MiqAeServiceModelBase
   	expose :ext_management_system, :association => true
   	expose :physical_servers,      :association => true
-  	#expose :to_s
-
 
   	def turn_on_loc_led
   		object_send(:turn_on_loc_led)
