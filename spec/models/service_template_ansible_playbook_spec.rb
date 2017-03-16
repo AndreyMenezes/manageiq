@@ -58,6 +58,21 @@ describe ServiceTemplateAnsiblePlaybook do
     )
   end
 
+  let(:catalog_item_options_three) do
+    changed_items = { :name        => 'test_update_ansible_item',
+                      :description => 'test updated ansible item',
+                      :config_info => {
+                        :provision => {
+                          :new_dialog_name => 'test_dialog_updated',
+                          :extra_vars      => {
+                            'key1' => 'updated_val1',
+                            'key2' => 'updated_val2'
+                          }
+                        }
+                      }}
+    catalog_item_options.deep_merge(changed_items)
+  end
+
   describe 'building_job_templates' do
     it '#create_job_templates' do
       expect(described_class).to receive(:create_job_template).exactly(2).times.and_return(job_template)
@@ -127,7 +142,7 @@ describe ServiceTemplateAnsiblePlaybook do
     end
   end
 
-  describe '#create_catalog_item' do
+  describe '.create_catalog_item' do
     it 'creates and returns a catalog item' do
       expect(described_class)
         .to receive(:create_job_templates).and_return(:provision => {:configuration_template => job_template})
@@ -145,6 +160,91 @@ describe ServiceTemplateAnsiblePlaybook do
 
       saved_options = catalog_item_options_two[:config_info].deep_merge(:provision => {:dialog_id => service_template.dialogs.first.id})
       expect(service_template.options[:config_info]).to include(saved_options)
+    end
+  end
+
+  describe '.validate_config_info' do
+    context 'provisioning entry point is given' do
+      it 'keeps the given entry point' do
+        opts = described_class.send(:validate_config_info, :provision => {:fqname => 'a/b/c'})
+        expect(opts[:provision][:fqname]).to eq('a/b/c')
+      end
+    end
+
+    context 'provisioning entry point is not given' do
+      it 'sets the default entry point' do
+        opts = described_class.send(:validate_config_info, :provision => {})
+        expect(opts[:provision][:fqname]).to eq(described_class.default_provisioning_entry_point('atomic'))
+      end
+    end
+
+    context 'retirement entry point is given' do
+      it 'keeps the given entry point' do
+        opts = described_class.send(:validate_config_info, :retirement => {:fqname => 'a/b/c'})
+        expect(opts[:retirement][:fqname]).to eq('a/b/c')
+      end
+    end
+
+    context 'retirement entry point is not given' do
+      it 'sets the default entry point' do
+        opts = described_class.send(:validate_config_info, {})
+        expect(opts[:retirement][:fqname]).to eq(described_class.default_retirement_entry_point)
+      end
+    end
+
+    context 'with remove_resources in retirement option' do
+      it 'sets the corresponding entry point' do
+        %w(yes_without_playbook no_without_playbook no_with_playbook pre_with_playbook post_with_playbook).each do |opt|
+          opts = described_class.send(:validate_config_info, :retirement => {:remove_resources => opt})
+          expect(opts[:retirement][:fqname]).to eq(described_class.const_get(:RETIREMENT_ENTRY_POINTS)[opt])
+        end
+      end
+    end
+  end
+
+  describe '#update_catalog_item' do
+    it 'updates and returns the modified catalog item' do
+      service_template = prebuild_service_template
+      new_dialog_label = catalog_item_options_three
+                         .fetch_path(:config_info, :provision, :new_dialog_name)
+      expect(Dialog.where(:label => new_dialog_label)).to be_empty
+      expect(ManageIQ::Providers::EmbeddedAnsible::AutomationManager::ConfigurationScript).to receive(:update_in_provider_queue).once
+      service_template.update_catalog_item(catalog_item_options_three, user)
+
+      expect(service_template.name).to eq(catalog_item_options_three[:name])
+      expect(service_template.description).to eq(catalog_item_options_three[:description])
+      expect(service_template.options.fetch_path(:config_info, :provision, :extra_vars)).to have_attributes(
+        'key1' => 'updated_val1',
+        'key2' => 'updated_val2'
+      )
+      new_dialog_record = Dialog.where(:label => new_dialog_label).first
+      expect(new_dialog_record).to be_truthy
+      expect(service_template.resource_actions.first.dialog.id).to eq new_dialog_record.id
+    end
+
+    it 'uses the existing dialog if :service_dialog_id is passed in' do
+      service_template = prebuild_service_template
+      info = catalog_item_options_three.fetch_path(:config_info, :provision)
+      info.delete(:new_dialog_name)
+      info[:service_dialog_id] = service_template.dialogs.first.id
+
+      expect(service_template.dialogs.first.id).to eq info[:service_dialog_id]
+      expect(described_class).to receive(:create_new_dialog).never
+      expect(ManageIQ::Providers::EmbeddedAnsible::AutomationManager::ConfigurationScript).to receive(:update_in_provider_queue).once
+
+      service_template.update_catalog_item(catalog_item_options_three, user)
+      service_template.reload
+
+      expect(service_template.dialogs.first.id).to eq info[:service_dialog_id]
+    end
+
+    def prebuild_service_template
+      expect(described_class)
+        .to receive(:create_job_templates).and_return(:provision => {:configuration_template => job_template})
+      service_template = described_class.create_catalog_item(catalog_item_options_two, user)
+      expect(service_template).to receive(:job_template)
+        .and_return(job_template).at_least(:once)
+      service_template
     end
   end
 end

@@ -8,7 +8,6 @@ module MiqServer::WorkerManagement::Monitor::ClassNames
     ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCollectorWorker
     ManageIQ::Providers::Openshift::ContainerManager::MetricsCollectorWorker
     ManageIQ::Providers::Google::CloudManager::MetricsCollectorWorker
-    ManageIQ::Providers::OpenshiftEnterprise::ContainerManager::MetricsCollectorWorker
     ManageIQ::Providers::Vmware::InfraManager::MetricsCollectorWorker
     ManageIQ::Providers::Openstack::CloudManager::MetricsCollectorWorker
     ManageIQ::Providers::Openstack::NetworkManager::MetricsCollectorWorker
@@ -31,7 +30,6 @@ module MiqServer::WorkerManagement::Monitor::ClassNames
     ManageIQ::Providers::Hawkular::DatawarehouseManager::RefreshWorker
     ManageIQ::Providers::Kubernetes::ContainerManager::RefreshWorker
     ManageIQ::Providers::Openshift::ContainerManager::RefreshWorker
-    ManageIQ::Providers::OpenshiftEnterprise::ContainerManager::RefreshWorker
     ManageIQ::Providers::Microsoft::InfraManager::RefreshWorker
     ManageIQ::Providers::Redhat::InfraManager::RefreshWorker
     ManageIQ::Providers::Openstack::CloudManager::RefreshWorker
@@ -53,7 +51,6 @@ module MiqServer::WorkerManagement::Monitor::ClassNames
     ManageIQ::Providers::Google::CloudManager::EventCatcher
     ManageIQ::Providers::Kubernetes::ContainerManager::EventCatcher
     ManageIQ::Providers::Openshift::ContainerManager::EventCatcher
-    ManageIQ::Providers::OpenshiftEnterprise::ContainerManager::EventCatcher
     ManageIQ::Providers::Redhat::InfraManager::EventCatcher
     ManageIQ::Providers::Openstack::CloudManager::EventCatcher
     ManageIQ::Providers::Openstack::NetworkManager::EventCatcher
@@ -87,7 +84,6 @@ module MiqServer::WorkerManagement::Monitor::ClassNames
     ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCollectorWorker
     ManageIQ::Providers::Openshift::ContainerManager::MetricsCollectorWorker
     ManageIQ::Providers::Google::CloudManager::MetricsCollectorWorker
-    ManageIQ::Providers::OpenshiftEnterprise::ContainerManager::MetricsCollectorWorker
     ManageIQ::Providers::Vmware::InfraManager::MetricsCollectorWorker
     ManageIQ::Providers::Openstack::CloudManager::MetricsCollectorWorker
     ManageIQ::Providers::Openstack::NetworkManager::MetricsCollectorWorker
@@ -117,7 +113,6 @@ module MiqServer::WorkerManagement::Monitor::ClassNames
     ManageIQ::Providers::Hawkular::DatawarehouseManager::RefreshWorker
     ManageIQ::Providers::Kubernetes::ContainerManager::RefreshWorker
     ManageIQ::Providers::Openshift::ContainerManager::RefreshWorker
-    ManageIQ::Providers::OpenshiftEnterprise::ContainerManager::RefreshWorker
     ManageIQ::Providers::Microsoft::InfraManager::RefreshWorker
     ManageIQ::Providers::Redhat::InfraManager::RefreshWorker
     ManageIQ::Providers::Openstack::CloudManager::RefreshWorker
@@ -151,7 +146,6 @@ module MiqServer::WorkerManagement::Monitor::ClassNames
     ManageIQ::Providers::Google::CloudManager::EventCatcher
     ManageIQ::Providers::Kubernetes::ContainerManager::EventCatcher
     ManageIQ::Providers::Openshift::ContainerManager::EventCatcher
-    ManageIQ::Providers::OpenshiftEnterprise::ContainerManager::EventCatcher
     MiqUiWorker
     MiqWebsocketWorker
   ).freeze

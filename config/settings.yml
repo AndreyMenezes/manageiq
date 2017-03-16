@@ -96,6 +96,10 @@
     :keep_drift_states: 6.months
     :purge_window_size: 10000
 :ems:
+  :ems_openstack:
+    :excon:
+      :omit_default_port: true
+      :read_timeout: 60
   :ems_redhat:
     :resolve_ip_addresses: true
     :inventory:
@@ -129,8 +133,6 @@
   :kubernetes:
     :refresh_interval: 15.minutes
   :openshift:
-    :refresh_interval: 15.minutes
-  :openshift_enterprise:
     :refresh_interval: 15.minutes
   :raise_vm_snapshot_complete_if_created_within: 15.minutes
   :refresh_interval: 24.hours
@@ -1295,14 +1297,11 @@
         :poll: 1.seconds
       :event_catcher_openshift:
         :poll: 1.seconds
-      :event_catcher_openshift_enterprise:
-        :poll: 1.seconds
-      :event_catcher_atomic_enterprise:
-        :poll: 1.seconds
       :event_catcher_cinder:
         :poll: 10.seconds
       :event_catcher_swift:
         :poll: 10.seconds
+      :event_catcher_openstack_service: "auto"
     :queue_worker_base:
       :defaults:
         :cpu_usage_threshold: 100.percent
@@ -1322,7 +1321,6 @@
           :metrics_port: 5000
           :metrics_path: "/hawkular/metrics"
         :ems_metrics_collector_worker_openshift: {}
-        :ems_metrics_collector_worker_openshift_enterprise: {}
         :ems_metrics_collector_worker_openstack: {}
         :ems_metrics_collector_worker_openstack_infra: {}
         :ems_metrics_collector_worker_openstack_network: {}
@@ -1355,7 +1353,6 @@
         :ems_refresh_worker_kubernetes: {}
         :ems_refresh_worker_microsoft: {}
         :ems_refresh_worker_openshift: {}
-        :ems_refresh_worker_openshift_enterprise: {}
         :ems_refresh_worker_openstack: {}
         :ems_refresh_worker_openstack_infra: {}
         :ems_refresh_worker_openstack_network: {}
