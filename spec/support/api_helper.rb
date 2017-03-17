@@ -100,10 +100,6 @@ module Spec
         role.update_attributes!(:miq_product_features => product_features)
       end
 
-      def miq_server_guid
-        @miq_server_guid ||= MiqUUID.new_guid
-      end
-
       def stub_api_action_role(collection, action_type, method, action, identifier)
         new_action_role = Config::Options.new.merge!("name" => action.to_s, "identifier" => identifier)
         updated_method = Api::ApiConfig.collections[collection][action_type][method].collect do |method_action|
@@ -265,6 +261,30 @@ module Spec
             "tag_name"     => tag_result[:tag_name]
           )
         end
+      end
+
+      def expect_options_results(type, data = {})
+        klass = Api::ApiConfig.collections[type].klass.constantize
+        attributes = select_attributes(klass.attribute_names - klass.virtual_attribute_names)
+        reflections = (klass.reflections.keys | klass.virtual_reflections.keys.collect(&:to_s)).sort
+        subcollections = Array(Api::ApiConfig.collections[type].subcollections).collect(&:to_s).sort
+        expected = {
+          'attributes'         => attributes,
+          'virtual_attributes' => select_attributes(klass.virtual_attribute_names),
+          'relationships'      => reflections,
+          'subcollections'     => subcollections,
+          'data'               => data
+        }
+        expect(response.parsed_body).to eq(expected)
+        expect(response.headers['Access-Control-Allow-Methods']).to include('OPTIONS')
+      end
+
+      def select_attributes(attrlist)
+        attrlist.sort.select { |attr| !encrypted_attribute?(attr) }
+      end
+
+      def encrypted_attribute?(attr)
+        Api::Environment.normalized_attributes[:encrypted].key?(attr.to_s) || attr.to_s.include?('password')
       end
     end
   end
