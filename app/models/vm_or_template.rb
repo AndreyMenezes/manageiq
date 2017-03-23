@@ -336,24 +336,7 @@ class VmOrTemplate < ApplicationRecord
   # cb_method:    the MiqQueue callback method along with the parameters that is called
   #               when automate process is done and the event is not prevented to proceed by policy
   def check_policy_prevent(policy_event, *cb_method)
-    cb = {
-      :class_name  => self.class.to_s,
-      :instance_id => id,
-      :method_name => :check_policy_prevent_callback,
-      :args        => [*cb_method],
-      :server_guid => MiqServer.my_guid
-    }
-    enforce_policy(policy_event, {}, :miq_callback => cb) unless policy_event.nil?
-  end
-
-  def check_policy_prevent_callback(*action, _status, _message, result)
-    prevented = false
-    if result.kind_of?(MiqAeEngine::MiqAeWorkspaceRuntime)
-      event = result.get_obj_from_path("/")['event_stream']
-      data  = event.attributes["full_data"]
-      prevented = data.fetch_path(:policy, :prevented) if data
-    end
-    prevented ? _log.info(event.attributes["message"].to_s) : send(*action)
+    enforce_policy(policy_event, {}, {:miq_callback => prevent_callback_settings(*cb_method)}) unless policy_event.nil?
   end
 
   def enforce_policy(event, inputs = {}, options = {})
@@ -1538,12 +1521,8 @@ class VmOrTemplate < ApplicationRecord
   # Hardware Disks/Memory storage methods
   #
 
-  virtual_delegate :allocated_disk_storage, :used_disk_storage,
+  virtual_delegate :allocated_disk_storage, :used_disk_storage, :provisioned_storage,
                    :to => :hardware, :allow_nil => true, :uses => {:hardware => :disks}
-
-  def provisioned_storage
-    allocated_disk_storage.to_i + ram_size_in_bytes
-  end
 
   def used_storage
     used_disk_storage.to_i + ram_size_in_bytes
@@ -1837,6 +1816,12 @@ class VmOrTemplate < ApplicationRecord
     user = evm_owner
     user = User.super_admin.tap { |u| u.current_group = miq_group } if user.nil? || !user.miq_group_ids.include?(miq_group_id)
     user
+  end
+
+  supports :console do
+    unless console_supported?('spice') || console_supported?('vnc')
+      unsupported_reason_add(:console, N_("Console not supported"))
+    end
   end
 
   private

@@ -229,11 +229,12 @@ describe EmbeddedAnsible do
         expect(described_class).to receive(:generate_database_authentication).and_return(double(:userid => "awx", :password => "databasepassword"))
         expect(AwesomeSpawn).to receive(:run!) do |script_path, options|
           params                  = options[:params]
-          inventory_file_contents = File.read(params[:i])
+          inventory_file_contents = File.read(params[:inventory=])
 
           expect(script_path).to eq("/opt/ansible-installer/setup.sh")
-          expect(params[:e]).to eq(extra_vars)
-          expect(params[:k]).to eq("packages,migrations,firewall,supervisor")
+          expect(params["--"]).to be_nil
+          expect(params[:extra_vars=]).to eq(extra_vars)
+          expect(params[:skip_tags=]).to eq("packages,migrations,firewall,supervisor")
 
           new_admin_auth  = miq_database.ansible_admin_authentication
           new_rabbit_auth = miq_database.ansible_rabbitmq_authentication
@@ -255,11 +256,12 @@ describe EmbeddedAnsible do
 
         expect(AwesomeSpawn).to receive(:run!) do |script_path, options|
           params                  = options[:params]
-          inventory_file_contents = File.read(params[:i])
+          inventory_file_contents = File.read(params[:inventory=])
 
           expect(script_path).to eq("/opt/ansible-installer/setup.sh")
-          expect(params[:e]).to eq(extra_vars)
-          expect(params[:k]).to eq("packages,migrations,firewall,supervisor")
+          expect(params["--"]).to be_nil
+          expect(params[:extra_vars=]).to eq(extra_vars)
+          expect(params[:skip_tags=]).to eq("packages,migrations,firewall,supervisor")
 
           expect(inventory_file_contents).to include("admin_password='adminpassword'")
           expect(inventory_file_contents).to include("rabbitmq_username='rabbituser'")
@@ -273,19 +275,24 @@ describe EmbeddedAnsible do
     end
 
     describe ".start" do
-      it "runs the setup script with the correct args" do
+      before do
         miq_database.set_ansible_admin_authentication(:password => "adminpassword")
         miq_database.set_ansible_rabbitmq_authentication(:userid => "rabbituser", :password => "rabbitpassword")
         miq_database.set_ansible_database_authentication(:userid => "databaseuser", :password => "databasepassword")
 
         expect(described_class).to receive(:configure_secret_key)
+        stub_const("EmbeddedAnsible::WAIT_FOR_ANSIBLE_SLEEP", 0)
+      end
+
+      it "runs the setup script with the correct args" do
         expect(AwesomeSpawn).to receive(:run!) do |script_path, options|
           params                  = options[:params]
-          inventory_file_contents = File.read(params[:i])
+          inventory_file_contents = File.read(params[:inventory=])
 
           expect(script_path).to eq("/opt/ansible-installer/setup.sh")
-          expect(params[:e]).to eq(extra_vars)
-          expect(params[:k]).to eq("packages,migrations,firewall")
+          expect(params["--"]).to be_nil
+          expect(params[:extra_vars=]).to eq(extra_vars)
+          expect(params[:skip_tags=]).to eq("packages,migrations,firewall")
 
           expect(inventory_file_contents).to include("admin_password='adminpassword'")
           expect(inventory_file_contents).to include("rabbitmq_username='rabbituser'")
@@ -293,8 +300,25 @@ describe EmbeddedAnsible do
           expect(inventory_file_contents).to include("pg_username='databaseuser'")
           expect(inventory_file_contents).to include("pg_password='databasepassword'")
         end
+        expect(described_class).to receive(:alive?).and_return(true)
 
         described_class.start
+      end
+
+      it "waits for Ansible to respond" do
+        expect(AwesomeSpawn).to receive(:run!)
+
+        expect(described_class).to receive(:alive?).exactly(3).times.and_return(false, false, true)
+
+        described_class.start
+      end
+
+      it "raises if Ansible doesn't respond" do
+        expect(AwesomeSpawn).to receive(:run!)
+
+        expect(described_class).to receive(:alive?).exactly(5).times.and_return(false)
+
+        expect { described_class.start }.to raise_error(RuntimeError)
       end
     end
 

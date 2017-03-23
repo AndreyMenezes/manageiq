@@ -50,13 +50,12 @@ gem "default_value_for",              "~>3.0.2"
 gem "elif",                           "=0.1.0",        :require => false
 gem "fast_gettext",                   "~>1.2.0"
 gem "fog-google",                     ">=0.5.2",       :require => false
-gem "fog-vcloud-director",            "~>0.1.8",       :require => false
 gem "gettext_i18n_rails",             "~>1.7.2"
 gem "gettext_i18n_rails_js",          "~>1.1.0"
 gem "google-api-client",              "~>0.8.6",       :require => false
 gem "hamlit",                         "~>2.7.0"
 gem "hashie",                         "~>3.4.6",       :require => false
-gem "high_voltage",                   "~>2.4.0"
+gem "high_voltage",                   "~>3.0.0"
 gem "htauth",                         "2.0.0",         :require => false
 gem "inifile",                        "~>3.0",         :require => false
 gem "jbuilder",                       "~>2.5.0" # For the REST API
@@ -72,7 +71,7 @@ gem "novnc-rails",                    "~>0.2"
 gem "omniauth",                       "~>1.3.1",       :require => false
 gem "omniauth-google-oauth2",         "~>0.2.6"
 gem "open4",                          "~>1.3.0",       :require => false
-gem "ovirt-engine-sdk",               "~>4.0.10",      :require => false # Required by the oVirt provider
+gem "ovirt-engine-sdk",               "~>4.1.4",       :require => false # Required by the oVirt provider
 gem "ovirt_metrics",                  "~>1.4.1",       :require => false
 gem "pg-pglogical",                   "~>1.1.0",       :require => false
 gem "puma",                           "~>3.3.0"

@@ -104,7 +104,7 @@ module MiqWebServerWorkerMixin
       options = {
         :member_file    => self::BALANCE_MEMBER_CONFIG_FILE,
         :redirects_file => self::REDIRECTS_CONFIG_FILE,
-        :method         => self::LB_METHOD,
+        :lbmethod       => self::LB_METHOD,
         :redirects      => self::REDIRECTS,
         :cluster        => self::CLUSTER,
         :protocol       => self::PROTOCOL
@@ -112,7 +112,6 @@ module MiqWebServerWorkerMixin
 
       _log.info("[#{options.inspect}")
       MiqApache::Conf.install_default_config(options)
-      add_apache_balancer_members
     end
 
     def port_range

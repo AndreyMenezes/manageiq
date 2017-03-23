@@ -13,7 +13,7 @@ describe Job do
       @schedule_worker_settings = MiqScheduleWorker.worker_settings
 
       @vm       = FactoryGirl.create(:vm_vmware, :ems_id => @ems.id, :host_id => @host.id)
-      @job      = @vm.scan
+      @job      = @vm.raw_scan
     end
 
     context "where job is dispatched but never started" do
@@ -126,7 +126,7 @@ describe Job do
         @zone2     = FactoryGirl.create(:zone)
         @ems2      = FactoryGirl.create(:ems_vmware, :zone => @zone2, :name => "Test EMS 2")
         @vm2       = FactoryGirl.create(:vm_vmware, :ems_id => @ems2.id)
-        @job2      = @vm2.scan
+        @job2      = @vm2.raw_scan
         @job2.zone = @zone2.name
         description = "Snapshot for scan job: #{@job2.guid}, EVM Server build: #{build} #{scan_type} Server Time: #{Time.now.utc.iso8601}"
         @snapshot2 = FactoryGirl.create(:snapshot, :vm_or_template_id => @vm2.id, :name => 'EvmSnapshot', :description => description)
@@ -255,7 +255,7 @@ describe Job do
           :container_image, :ext_management_system => @ems_k8s, :name => 'test',
           :image_ref => "docker://3629a651e6c11d7435937bdf41da11cf87863c03f2587fa788cf5cbfe8a11b9a"
         )
-        @image_scan_job = @image.ext_management_system.raw_scan_job_create(@image)
+        @image_scan_job = @image.ext_management_system.raw_scan_job_create(@image.class, @image.id)
       end
 
       context "#target_entity" do
@@ -293,6 +293,13 @@ describe Job do
     end
   end
 
+  describe "#attributes_log" do
+    it "returns attributes for logging" do
+      job = Job.create_job("VmScan", :name => "Hello, World!")
+      expect(job.attributes_log).to include("VmScan", "Hello, World!", job.guid)
+    end
+  end
+
   context "belongs_to task" do
     before(:each) do
       @job = Job.create_job("VmScan", :name => "Hello, World!")
@@ -320,6 +327,7 @@ describe Job do
         )
       end
     end
+
     context "after_update_commit callback calls" do
       describe "#update_linked_task" do
         it "executes when 'after_update_commit' callbacke triggered" do

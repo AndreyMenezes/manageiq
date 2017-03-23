@@ -1332,6 +1332,16 @@ firewall_rules:
 - source_ip_range
 - ems_ref
 - network_protocol
+firmwares:
+- id
+- name
+- build
+- version
+- release_date
+- resource_id
+- resource_type
+- created_at
+- updated_at
 flavors:
 - id
 - ems_id
@@ -1568,8 +1578,6 @@ jobs:
 - type
 - process
 - agent_id
-- agent_class
-- agent_state
 - agent_message
 - started_on
 - dispatch_status
@@ -4858,10 +4866,12 @@ miq_alert_statuses:
 - result
 - url
 - severity
-- ancestry
 - acknowledged
 - ems_id
 - description
+- resolved
+- event_ems_ref
+- assignee_id
 miq_alerts:
 - id
 - guid

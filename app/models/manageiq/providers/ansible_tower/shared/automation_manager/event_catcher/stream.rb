@@ -14,7 +14,7 @@ module ManageIQ::Providers::AnsibleTower::Shared::AutomationManager::EventCatche
           loop do
             ansible.api.activity_stream.all(filter).each do |activity|
               throw :stop_polling if @stop_polling
-              yield activity
+              yield activity.to_h
               @last_activity = activity
             end
             sleep @poll_sleep
@@ -30,9 +30,10 @@ module ManageIQ::Providers::AnsibleTower::Shared::AutomationManager::EventCatche
   private
 
   def filter
+    timestamp = @last_activity ? Time.zone.parse(@last_activity.timestamp.to_s) : 1.minute.ago
     {
       :order_by      => 'timestamp',
-      :timestamp__gt => @last_activity ? @last_activity.timestamp : 1.minute.ago.to_s(:db)
+      :timestamp__gt => timestamp.to_s(:db)
     }
   end
 end

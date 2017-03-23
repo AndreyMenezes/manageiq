@@ -1,69 +1,41 @@
-require "ansible_tower_client"
+require 'support/ansible_shared/provider'
 
 describe ManageIQ::Providers::EmbeddedAnsible::Provider do
-  subject { FactoryGirl.build(:provider_embedded_ansible) }
+  subject { FactoryGirl.create(:provider_embedded_ansible) }
 
-  describe "#connect" do
-    let(:attrs) { {:username => "admin", :password => "smartvm", :verify_ssl => OpenSSL::SSL::VERIFY_PEER} }
+  it_behaves_like 'ansible provider'
 
-    it "with no port" do
-      url = "example.com"
+  context "DefaultAnsibleObjects concern" do
+    context "with no attributes" do
+      %w(organization credential inventory host).each do |obj_name|
+        it "#default_#{obj_name} returns nil" do
+          expect(subject.public_send("default_#{obj_name}")).to be_nil
+        end
 
-      expect(AnsibleTowerClient::Connection).to receive(:new).with(attrs.merge(:base_url => url))
-      subject.connect(attrs.merge(:url => url))
+        it "#default_#{obj_name}= creates a new custom attribute" do
+          subject.public_send("default_#{obj_name}=", obj_name.length)
+          expect(subject.default_ansible_objects.find_by(:name => obj_name).value.to_i).to eq(obj_name.length)
+        end
+      end
     end
 
-    it "with a port" do
-      url = "example.com:555"
+    context "with attributes saved" do
+      before do
+        %w(organization credential inventory host).each do |obj_name|
+          subject.default_ansible_objects.create(:name => obj_name, :value => obj_name.length)
+        end
+      end
 
-      expect(AnsibleTowerClient::Connection).to receive(:new).with(attrs.merge(:base_url => url))
-      subject.connect(attrs.merge(:url => url))
+      %w(organization credential inventory host).each do |obj_name|
+        it "#default_#{obj_name} returns the saved value" do
+          expect(subject.public_send("default_#{obj_name}")).to eq(obj_name.length)
+        end
+
+        it "#default_#{obj_name}= doesn't create a second object if we pass the same value" do
+          subject.public_send("default_#{obj_name}=", obj_name.length)
+          expect(subject.default_ansible_objects.where(:name => obj_name).count).to eq(1)
+        end
+      end
     end
-  end
-
-  describe "#destroy" do
-    it "will remove all child objects" do
-      provider = FactoryGirl.create(:provider_embedded_ansible, :zone => FactoryGirl.create(:zone))
-
-      provider.automation_manager.configured_systems = [
-        FactoryGirl.create(:configured_system, :computer_system =>
-          FactoryGirl.create(:computer_system,
-                             :operating_system => FactoryGirl.create(:operating_system),
-                             :hardware         => FactoryGirl.create(:hardware),
-                            )
-                          )
-      ]
-
-      provider.destroy
-
-      expect(Provider.count).to              eq(0)
-      expect(ConfiguredSystem.count).to      eq(0)
-      expect(ComputerSystem.count).to        eq(0)
-      expect(OperatingSystem.count).to       eq(0)
-      expect(Hardware.count).to              eq(0)
-    end
-  end
-
-  context "#url=" do
-    it "with full URL" do
-      subject.url = "https://server.example.com:1234/api/v1"
-      expect(subject.url).to eq("https://server.example.com:1234/api/v1")
-    end
-
-    it "missing scheme" do
-      subject.url = "server.example.com:1234/api/v1"
-      expect(subject.url).to eq("https://server.example.com:1234/api/v1")
-    end
-
-    it "works with #update_attributes" do
-      subject.update_attributes(:url => "server.example.com")
-      subject.update_attributes(:url => "server2.example.com")
-      expect(Endpoint.find(subject.default_endpoint.id).url).to eq("https://server2.example.com/api/v1")
-    end
-  end
-
-  it "with only hostname" do
-    subject.url = "server.example.com"
-    expect(subject.url).to eq("https://server.example.com/api/v1")
   end
 end

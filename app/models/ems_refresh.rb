@@ -17,11 +17,9 @@ module EmsRefresh
   extend EmsRefresh::SaveInventoryOrchestrationStacks
   extend EmsRefresh::LinkInventory
   extend EmsRefresh::MetadataRelats
-  extend EmsRefresh::VcUpdates
 
   def self.debug_trace
-    # TODO: Replace with configuration option
-    false
+    Settings.ems_refresh[:debug_trace]
   end
 
   # If true, Refreshers will raise any exceptions encountered, instead
@@ -184,7 +182,7 @@ module EmsRefresh
         :task_id      => task_id,
         :msg_timeout  => queue_timeout,
         :miq_callback => {
-          :class_name  => task.class.name,
+          :class_name  => 'MiqTask',
           :method_name => :queue_callback,
           :instance_id => task_id,
           :args        => ['Finished']

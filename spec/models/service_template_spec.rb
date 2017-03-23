@@ -193,6 +193,22 @@ describe ServiceTemplate do
 
       @svc_a.create_service(sub_svc)
     end
+
+    it "should pass display attribute to created top level service" do
+      @svc_a.display = true
+      expect(@svc_a.create_service(double(:options => {:dialog => {}})).display).to eq(true)
+    end
+
+    it "should set created child service's display to false" do
+      @svc_a.display = true
+      allow(@svc_b).to receive(:add_resource!)
+      expect(@svc_a.create_service(double(:options => {:dialog => {}}), @svc_b).display).to eq(false)
+    end
+
+    it "should set created service's display to false by default" do
+      expect(@svc_a.create_service(double(:options => {:dialog => {}})).display).to eq(false)
+    end
+
     it "should return all parent services for a service" do
       add_and_save_service(@svc_a, @svc_b)
       add_and_save_service(@svc_a, @svc_c)
@@ -601,6 +617,7 @@ describe ServiceTemplate do
 
     before do
       @catalog_item = ServiceTemplate.create_catalog_item(catalog_item_options, user)
+      @catalog_item.update_attributes!(:options => @catalog_item.options.merge(:foo => 'bar'))
     end
 
     it 'updates the catalog item' do
@@ -613,6 +630,7 @@ describe ServiceTemplate do
       expect(updated.name).to eq('Updated Template Name')
       expect(updated.service_resources.first.resource.source_id).to eq(new_vm.id) # Validate request update
       expect(updated.config_info).to eq(updated_catalog_item_options[:config_info])
+      expect(updated.options.key?(:foo)).to be_truthy # Test that the options were merged
     end
 
     it 'does not allow service_type to be changed' do
