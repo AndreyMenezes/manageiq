@@ -1,3 +1,5 @@
+require 'fog/openstack'
+
 describe ManageIQ::Providers::Openstack::InfraManager::Refresher do
   before(:each) do
     _guid, _server, zone = EvmSpecHelper.create_guid_miq_server_zone
@@ -20,6 +22,7 @@ describe ManageIQ::Providers::Openstack::InfraManager::Refresher do
       #   query param to avoid HTTP caching - ignore_awful_caching##########
       #   https://github.com/fog/fog/blob/master/lib/fog/openstack/compute.rb#L308
       VCR.use_cassette("#{described_class.name.underscore}_rhos_juno", :match_requests_on => [:method, :host, :path]) do
+        Fog::OpenStack.instance_variable_set(:@version, nil)
         EmsRefresh.refresh(@ems)
         EmsRefresh.refresh(@ems.network_manager)
       end
@@ -40,6 +43,7 @@ describe ManageIQ::Providers::Openstack::InfraManager::Refresher do
                      :match_requests_on => [:method, :host, :path]) do
       @ems.reload
       @ems.reset_openstack_handle
+      Fog::OpenStack.instance_variable_set(:@version, nil)
       EmsRefresh.refresh(@ems)
       EmsRefresh.refresh(@ems.network_manager)
       @ems.reload

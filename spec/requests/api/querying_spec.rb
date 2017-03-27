@@ -643,6 +643,66 @@ describe "Querying" do
       expect(actions.first["name"]).to eq("suspend")
     end
 
+    it 'returns correct actions on a collection' do
+      api_basic_authorize(collection_action_identifier(:vms, :read, :get),
+                          action_identifier(:vms, :start),
+                          action_identifier(:vms, :stop))
+
+      run_get(vms_url)
+
+      actions = response.parsed_body['actions']
+      expect(actions.size).to eq(3)
+      expect(actions.collect { |a| a['name'] }).to match_array(%w(start stop query))
+      expect_result_to_have_keys(%w(name count subcount resources actions))
+    end
+
+    it 'returns correct actions on a subcollection' do
+      api_basic_authorize subcollection_action_identifier(:vms, :snapshots, :read, :get),
+                          subcollection_action_identifier(:vms, :snapshots, :delete, :post),
+                          subcollection_action_identifier(:vms, :snapshots, :create, :post)
+      vm = FactoryGirl.create(:vm)
+      FactoryGirl.create(:snapshot, :vm_or_template => vm)
+
+      run_get("#{vms_url(vm.id)}/snapshots")
+
+      actions = response.parsed_body['actions']
+      expect(actions.size).to eq(2)
+      expect(actions.collect { |a| a['name'] }).to match_array(%w(create delete))
+      expect_result_to_have_keys(%w(name count subcount resources actions))
+    end
+
+    it 'returns the correct actions on a subresource' do
+      api_basic_authorize subcollection_action_identifier(:vms, :snapshots, :delete, :post),
+                          subcollection_action_identifier(:vms, :snapshots, :read, :get),
+                          subcollection_action_identifier(:vms, :snapshots, :create, :post)
+
+      vm = FactoryGirl.create(:vm)
+      snapshot = FactoryGirl.create(:snapshot, :vm_or_template => vm)
+
+      run_get("#{vms_url(vm.id)}/snapshots/#{snapshot.id}")
+
+      actions = response.parsed_body['actions']
+      expect(actions.size).to eq(2)
+      expect(actions.collect { |a| a['name'] }).to match_array(%w(delete delete))
+      expect_result_to_have_keys(%w(href id actions))
+    end
+
+    it 'returns the correct actions on a resource' do
+      api_basic_authorize(action_identifier(:blueprints, :read, :resource_actions, :get),
+                          action_identifier(:blueprints, :delete),
+                          action_identifier(:blueprints, :publish),
+                          action_identifier(:blueprints, :edit))
+
+      blueprint = FactoryGirl.create(:blueprint)
+
+      run_get(blueprints_url(blueprint.id))
+
+      actions = response.parsed_body['actions']
+      expect(actions.size).to eq(4)
+      expect(actions.collect { |a| a['name'] }).to match_array(%w(delete delete publish edit))
+      expect_result_to_have_keys(%w(href id actions))
+    end
+
     it "returns multiple actions if authorized as such" do
       api_basic_authorize(action_identifier(:vms, :start),
                           action_identifier(:vms, :stop),
@@ -695,16 +755,9 @@ describe "Querying" do
   describe 'OPTIONS /api/vms' do
     it 'returns the options information' do
       api_basic_authorize
-      expected = {
-        'attributes'         => (Vm.attribute_names - Vm.virtual_attribute_names).sort.as_json,
-        'virtual_attributes' => Vm.virtual_attribute_names.sort.as_json,
-        'relationships'      => (Vm.reflections.keys | Vm.virtual_reflections.keys.collect(&:to_s)).sort,
-        'subcollections'     => Array(Api::ApiConfig.collections[:vms].subcollections).collect(&:to_s).sort,
-        'data'               => {}
-      }
+
       run_options(vms_url)
-      expect(response.parsed_body).to eq(expected)
-      expect(response.headers['Access-Control-Allow-Methods']).to include('OPTIONS')
+      expect_options_results(:vms)
     end
   end
 

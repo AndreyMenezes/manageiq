@@ -15,6 +15,8 @@ class PhysicalServer < ApplicationRecord
     nil               => "Unknown",
   }
 
+  has_one :host, :inverse_of => :physical_server
+
   def name_with_details
     details % {
       :name => name,
