@@ -1,15 +1,26 @@
 class EmbeddedAnsibleWorker < MiqWorker
   require_nested :Runner
+  include_concern 'ObjectManagement'
 
   self.required_roles = ['embedded_ansible']
 
   def start_runner
-    self.class::Runner.start_worker(worker_options)
-    # TODO: return supervisord pid
+    Thread.new do
+      begin
+        self.class::Runner.start_worker(worker_options)
+        # TODO: return supervisord pid
+      rescue SystemExit
+        # Because we're running in a thread on the Server
+        # we need to intercept SystemExit and exit our thread,
+        # not the main server thread!
+        log.info("#{log_prefix} SystemExit received, exiting monitoring Thread")
+        Thread.exit
+      end
+    end
   end
 
   def kill
-    # Does the base class's kill -9 work on the supervisord process as we want?
+    stop
   end
 
   def status_update

@@ -399,10 +399,12 @@
     - :name: Arbitration Profiles List
       :description: Display Lists of Arbitration Profiles
       :feature_type: view
+      :hidden: true
       :identifier: arbitration_profile_show_list
     - :name: Arbitration Profile Show
       :description: Display Individual Arbitration Profiles
       :feature_type: view
+      :hidden: true
       :identifier: arbitration_profile_show
     - :name: Timeline
       :description: Display Timelines for Cloud Providers
@@ -605,6 +607,23 @@
       :description: Edit Tags of Object Store Containers
       :feature_type: control
       :identifier: cloud_object_store_container_tag
+  - :name: Modify
+    :description: Modify Object Store Containers
+    :feature_type: admin
+    :identifier: cloud_object_store_container_admin
+    :children:
+    - :name: Create
+      :description: Create Cloud Object Store Container
+      :feature_type: admin
+      :identifier: cloud_object_store_container_new
+    - :name: Delete
+      :description: Delete Object Store Containers
+      :feature_type: admin
+      :identifier: cloud_object_store_container_delete
+    - :name: Clear
+      :description: Clear Object Store Containers
+      :feature_type: admin
+      :identifier: cloud_object_store_container_clear
 
 # CloudObjectStoreObject
 - :name: Cloud Objects
@@ -634,6 +653,15 @@
       :description: Edit Tags of Objects
       :feature_type: control
       :identifier: cloud_object_store_object_tag
+  - :name: Modify
+    :description: Modify Object Store Object
+    :feature_type: admin
+    :identifier: cloud_object_store_object_admin
+    :children:
+    - :name: Delete
+      :description: Delete Object Store Object
+      :feature_type: admin
+      :identifier: cloud_object_store_object_delete
 
 # CloudTenant
 - :name: Cloud Tenants
@@ -1844,7 +1872,7 @@
       :identifier: action_admin
       :children:
       - :name: List
-        :description: Display All MiqActions
+        :description: Display All Policy Actions
         :feature_type: view
         :identifier: action_show_list
       - :name: Show
@@ -1967,6 +1995,47 @@
       :description: Display Individual Alert Status
       :feature_type: admin
       :identifier: alert_status_action_new
+  - :name: Alert Definitions
+    :description: Everything under Alert Definitions
+    :feature_type: node
+    :hidden: true
+    :identifier: alert_definition
+    :children:
+    - :name: View
+      :description: View Alert Definitions
+      :feature_type: view
+      :identifier: alert_definition_view
+      :children:
+      - :name: List
+        :description: Display List of Alert Definitions
+        :feature_type: view
+        :identifier: alert_definitions_show_list
+      - :name: Show
+        :description: Display Individual Alert Definition
+        :feature_type: view
+        :identifier: alert_definition_show
+    - :name: Modify
+      :description: Modify Alert Definitions
+      :feature_type: admin
+      :hidden: true
+      :identifier: alert_definition_admin
+      :children:
+      - :name: Add
+        :description: Add an Alert Definition
+        :feature_type: admin
+        :hidden: true
+        :identifier: alert_definition_new
+      - :name: Edit
+        :description: Edit an Alert Definition
+        :feature_type: admin
+        :hidden: true
+        :identifier: alert_definition_edit
+      - :name: Delete
+        :description: Delete an Alert Definition
+        :feature_type: admin
+        :hidden: true
+        :identifier: alert_definition_delete
+
 # Policy Simulation
 - :name: Simulation
   :description: Policy Simulation
@@ -2655,6 +2724,23 @@
           :feature_type: admin
           :hidden: true
           :identifier: zone_delete
+    - :name: Regions
+      :description: Regions
+      :feature_type: node
+      :hidden: true
+      :identifier: region
+      :children:
+      - :name: Modify
+        :description: Modify Regions
+        :feature_type: admin
+        :identifier: region_admin
+        :hidden: true
+        :children:
+        - :name: Edit
+          :description: Edit a Region
+          :feature_type: admin
+          :hidden: true
+          :identifier: region_edit
   - :name: Access Control
     :description: Access Control Accordion
     :feature_type: node
@@ -3696,6 +3782,10 @@
       :description: Check Compliance of Last Known Configuration
       :feature_type: control
       :identifier: ems_container_check_compliance
+    - :name: Launch External Logging
+      :description: Open External Logging from Container Provider
+      :feature_type: control
+      :identifier: ems_container_launch_external_logging
     - :name: Container Deployments
       :description: Container Deployments
       :feature_type: node
@@ -4069,8 +4159,32 @@
       :description: Edit Tags of Middleware Server Groups
       :feature_type: control
       :identifier: middleware_server_group_tag
+    - :name: Reload middleware server group
+      :description: Trigger reload operation for Middleware Server Group
+      :feature_type: admin
+      :identifier: middleware_server_group_reload
+    - :name: Stop middleware server group
+      :description: Stop Middleware Server Group
+      :feature_type: admin
+      :identifier: middleware_server_group_stop
+    - :name: Start middleware server group
+      :description: Start Middleware Server Group
+      :feature_type: admin
+      :identifier: middleware_server_group_start
+    - :name: Suspend middleware server group
+      :description: Suspend Middleware Server Group
+      :feature_type: admin
+      :identifier: middleware_server_group_suspend
+    - :name: Resume middleware server group
+      :description: Resume a suspended Middleware Server Group
+      :feature_type: admin
+      :identifier: middleware_server_group_resume
+    - :name: Restart middleware server group
+      :description: Restart a Middleware Server Group
+      :feature_type: admin
+      :identifier: middleware_server_group_restart
     - :name: Add middleware deployment
-      :description: Add middleware deployment
+      :description: Add middleware deployment for Server Group
       :feature_type: admin
       :identifier: middleware_group_deployment_add
 
@@ -5123,14 +5237,96 @@
           :description: Edit Job Templates Tags
           :feature_type: control
           :identifier: configuration_script_tag
+
+# Embedded Automation Manager
+- :name: Embedded Automation Manager
+  :description: Everything under Ansible
+  :feature_type: node
+  :identifier: embedded_automation_manager
+  :children:
+  - :name: Repositories
+    :description: Everything under Repositories
+    :feature_type: node
+    :identifier: embedded_configuration_script_source
+    :children:
+    - :name: View
+      :description: View Repositories
+      :feature_type: view
+      :identifier: embedded_configuration_script_source_view
+    - :name: Modify
+      :description: Modify Repositories
+      :feature_type: admin
+      :identifier: embedded_configuration_script_source_admin
+      :children:
+        - :name: Add Repository
+          :description: Add a Repository
+          :feature_type: admin
+          :identifier: embedded_configuration_script_source_add
+        - :name: Edit Repository
+          :description: Edit a Repository
+          :feature_type: admin
+          :identifier: embedded_configuration_script_source_edit
+        - :name: Remove Repository
+          :description: Remove a Repository
+          :feature_type: admin
+          :identifier: embedded_configuration_script_source_delete
+  - :name: Playbooks
+    :description: Everything under Playbooks
+    :feature_type: node
+    :identifier: embedded_configuration_script_payload
+    :children:
+    - :name: View
+      :description: View Playbooks
+      :feature_type: view
+      :identifier: embedded_configuration_script_payload_view
+    - :name: Modify
+      :description: Modify Playbooks
+      :feature_type: admin
+      :identifier: embedded_configuration_script_payload_admin
+      :children:
+        - :name: Add Playbook
+          :description: Add a Playbook
+          :feature_type: admin
+          :identifier: embedded_configuration_script_payload_add
+        - :name: Edit Playbook
+          :description: Edit a Playbook
+          :feature_type: admin
+          :identifier: embedded_configuration_script_payload_edit
+  - :name: Credentials
+    :description: Everything under Credentials
+    :feature_type: node
+    :identifier: embedded_automation_manager_credentials
+    :children:
+    - :name: View
+      :description: View Credentials
+      :feature_type: view
+      :identifier: embedded_automation_manager_credentials_view
+    - :name: Modify
+      :description: Modify Credentials
+      :feature_type: admin
+      :identifier: embedded_automation_manager_credentials_admin
+      :children:
+        - :name: Add Credentials
+          :description: Add a Credential
+          :feature_type: admin
+          :identifier: embedded_automation_manager_credentials_add
+        - :name: Edit Credentials
+          :description: Edit a Credential
+          :feature_type: admin
+          :identifier: embedded_automation_manager_credentials_edit
+        - :name: Delete Credentials
+          :description: Delete a Credential
+          :feature_type: admin
+          :identifier: embedded_automation_manager_credentials_delete
+
 # Automation Manager
-- :name: Automation Manager
-  :description: Everything under Automation Manager
+- :name: Ansible Tower
+  :description: Everything under Ansible Tower
   :feature_type: node
   :identifier: automation_manager
   :children:
-  - :name: Automation Management Providers
-    :description: Everything under the Automation Management Providers accordion
+  - :name: Ansible Tower Providers
+    :description: Everything under the Providers accordion
     :feature_type: node
     :identifier: automation_manager_providers
     :children:
@@ -5661,6 +5857,10 @@
         :description: Open a web-based console for VMs
         :feature_type: control
         :identifier: vm_console
+      - :name: Console using WebMKS
+        :description: Open a web-based console for VMs
+        :feature_type: control
+        :identifier: vm_webmks_console
       - :name: Console using VNC
         :description: Open a web-based VNC console for VMs
         :feature_type: control
@@ -6201,6 +6401,17 @@
       :description: Display Individual Physical Server
       :feature_type: view
       :identifier: physical_server_show
+
+# Physical Infrastructure Topology
+- :name: Physical Infra Topology
+  :description: Physical Infra Topology
+  :feature_type: node
+  :identifier: physical_infra_topology
+  :children:
+    - :name: View
+      :description: View Physical Infra Topology
+      :feature_type: view
+      :identifier: physical_infra_topology_view
 
 # Monitor
 - :name: Monitor

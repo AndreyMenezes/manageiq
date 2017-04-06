@@ -6,6 +6,7 @@ class Hardware < ApplicationRecord
   belongs_to  :computer_system
 
   has_many    :networks, :dependent => :destroy
+  has_many    :firmwares, :as => :resource, :dependent => :destroy
 
   has_many    :disks, -> { order :location }, :dependent => :destroy
   has_many    :hard_disks, -> { where("device_type != 'floppy' AND device_type NOT LIKE '%cdrom%'").order(:location) }, :class_name => "Disk", :foreign_key => :hardware_id
@@ -23,6 +24,7 @@ class Hardware < ApplicationRecord
   virtual_column :ipaddresses,   :type => :string_set, :uses => :networks
   virtual_column :hostnames,     :type => :string_set, :uses => :networks
   virtual_column :mac_addresses, :type => :string_set, :uses => :nics
+
   virtual_aggregate :used_disk_storage,      :disks, :sum, :used_disk_storage
   virtual_aggregate :allocated_disk_storage, :disks, :sum, :size
   virtual_attribute :ram_size_in_bytes, :integer, :arel => ->(t) { t.grouping(t[:memory_mb] * 1.megabyte) }
@@ -119,6 +121,36 @@ class Hardware < ApplicationRecord
     t.grouping(Arel::Nodes::Division.new(
       Arel::Nodes::NamedFunction.new("CAST", [t[:disk_free_space].as("float")]),
       t[:disk_capacity]) * -100 + 100)
+  end)
+
+  def provisioned_storage
+    if has_attribute?("provisioned_storage")
+      self["provisioned_storage"]
+    else
+      allocated_disk_storage.to_i + ram_size_in_bytes
+    end
+  end
+
+  # added casts because we were overflowing integers
+  # resulting sql:
+  # (
+  #   (COALESCE(
+  #     ((SELECT SUM("disks"."size")
+  #       FROM "disks"
+  #       WHERE "hardwares"."id" = "disks"."hardware_id")),
+  #     0
+  #   )) + (COALESCE(
+  #     (CAST("hardwares"."memory_mb" AS bigint)),
+  #     0
+  #   )) * 1048576
+  # )
+  virtual_attribute :provisioned_storage, :integer, :arel => (lambda do |t|
+    t.grouping(
+      t.grouping(Arel::Nodes::NamedFunction.new('COALESCE', [arel_attribute(:allocated_disk_storage), 0])) +
+      t.grouping(Arel::Nodes::NamedFunction.new(
+                   'COALESCE', [t.grouping(Arel::Nodes::NamedFunction.new('CAST', [t[:memory_mb].as("bigint")])), 0]
+      )) * 1.megabyte
+    )
   end)
 
   def connect_lans(lans)

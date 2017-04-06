@@ -1,33 +1,50 @@
 module VmOrTemplate::Operations::Snapshot
-  def validate_create_snapshot
-    return {:available => false, :message => "Create Snapshot operation not supported for #{self.class.model_suffix} VM"} unless self.supports_snapshots?
-    unless supports_control?
-      return {:available => false, :message => unsupported_reason(:control)}
+  extend ActiveSupport::Concern
+
+  included do
+    supports :snapshot_create do
+      if supports_snapshots?
+        if !snapshots.blank? && snapshots.first.get_current_snapshot.nil?
+          unsupported_reason_add(:snapshot_create, _("At least one snapshot has to be active to create a new snapshot for this VM"))
+        end
+        unless supports_control?
+          unsupported_reason_add(:snapshot_create, unsupported_reason(:control))
+        end
+      else
+        unsupported_reason_add(:snapshot_create, _("Operation not supported"))
+      end
     end
-    msg = {:available => true, :message => nil}
-    msg[:message] = 'At least one snapshot has to be active to create a new snapshot for this VM' if !snapshots.blank? && snapshots.first.get_current_snapshot.nil?
-    msg
-  end
 
-  def validate_remove_snapshot(task = 'Remove')
-    return {:available => false, :message => "#{task} Snapshot operation not supported for #{self.class.model_suffix} VM"} unless self.supports_snapshots?
-    return {:available => false, :message => "There are no snapshots available for this VM"} if snapshots.size <= 0
-    unless supports_control?
-      return {:available => false, :message => unsupported_reason(:control)}
+    supports :remove_snapshot do
+      if supports_snapshots?
+        if snapshots.size <= 0
+          unsupported_reason_add(:remove_snapshot, _("No snapshots available for this VM"))
+        end
+        unless supports_control?
+          unsupported_reason_add(:remove_snapshot, unsupported_reason(:control))
+        end
+      else
+        unsupported_reason_add(:remove_snapshot, _("Operation not supported"))
+      end
     end
-    {:available => true, :message => nil}
-  end
 
-  def validate_remove_all_snapshots
-    validate_remove_snapshot
-  end
+    supports :remove_all_snapshots do
+      unless supports_remove_snapshot?
+        unsupported_reason_add(:remove_all_snapshots, unsupported_reason(:remove_snapshot))
+      end
+    end
 
-  def validate_remove_snapshot_by_description
-    validate_remove_snapshot
-  end
+    supports :remove_snapshot_by_description do
+      unless supports_remove_snapshot?
+        unsupported_reason_add(:remove_snapshot_by_description, unsupported_reason(:remove_snapshot))
+      end
+    end
 
-  def validate_revert_to_snapshot
-    validate_remove_snapshot('Revert')
+    supports :revert_to_snapshot do
+      unless supports_remove_snapshot?
+        unsupported_reason_add(:revert_to_snapshot, unsupported_reason(:remove_snapshot))
+      end
+    end
   end
 
   def raw_create_snapshot(name, desc = nil, memory)
@@ -39,8 +56,8 @@ module VmOrTemplate::Operations::Snapshot
   end
 
   def raw_remove_snapshot(snapshot_id)
-    raise_is_available_now_error_message(:remove_snapshot)
-    snapshot = snapshots.find_by_id(snapshot_id)
+    raise MiqVmError, unsupported_reason(:remove_snapshot) unless supports_remove_snapshot?
+    snapshot = snapshots.find_by(:id => snapshot_id)
     raise _("Requested VM snapshot not found, unable to remove snapshot") unless snapshot
     begin
       run_command_via_parent(:vm_remove_snapshot, :snMor => snapshot.uid_ems)
@@ -95,7 +112,7 @@ module VmOrTemplate::Operations::Snapshot
   end
 
   def raw_remove_snapshot_by_description(description, refresh = false)
-    raise_is_available_now_error_message(:remove_snapshot_by_description)
+    raise MiqVmError, unsupported_reason(:remove_snapshot_by_description) unless supports_remove_snapshot_by_description?
     run_command_via_parent(:vm_remove_snapshot_by_description, :description => description, :refresh => refresh)
   end
 
@@ -119,7 +136,7 @@ module VmOrTemplate::Operations::Snapshot
   end
 
   def raw_remove_all_snapshots
-    raise_is_available_now_error_message(:remove_all_snapshots)
+    raise MiqVmError, unsupported_reason(:remove_all_snapshots) unless supports_remove_all_snapshots?
     run_command_via_parent(:vm_remove_all_snapshots)
   end
 
@@ -128,8 +145,8 @@ module VmOrTemplate::Operations::Snapshot
   end
 
   def raw_revert_to_snapshot(snapshot_id)
-    raise_is_available_now_error_message(:revert_to_snapshot)
-    snapshot = snapshots.find_by_id(snapshot_id)
+    raise MiqVmError, unsupported_reason(:revert_to_snapshot) unless supports_revert_to_snapshot?
+    snapshot = snapshots.find_by(:id => snapshot_id)
     raise _("Requested VM snapshot not found, unable to RevertTo snapshot") unless snapshot
     run_command_via_parent(:vm_revert_to_snapshot, :snMor => snapshot.uid_ems)
   end

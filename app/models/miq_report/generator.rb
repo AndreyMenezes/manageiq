@@ -81,14 +81,27 @@ module MiqReport::Generator
   end
 
   def get_include_for_find
-    (include_as_hash || {}).deep_merge(include_for_find || {}).presence
+    (include_as_hash.presence || invent_includes).deep_merge(include_for_find || {}).presence
+  end
+
+  def invent_includes
+    return {} unless col_order
+    col_order.each_with_object({}) do |col, ret|
+      next unless col.include?(".")
+      *rels, _col = col.split(".")
+      rels.inject(ret) { |h, rel| h[rel.to_sym] ||= {} } unless col =~ /managed\./
+    end
   end
 
   def include_as_hash(includes = include, klass = nil)
     if klass.nil?
       klass = db_class
       result = {}
-      cols.each { |c| result.merge!(c.to_sym => {}) if klass.virtual_attribute?(c) || klass == LiveMetric } if cols
+      if cols && klass.respond_to?(:virtual_attribute?)
+        cols.each do |c|
+          result[c.to_sym] = {} if klass.virtual_attribute?(c) && !klass.attribute_supported_by_sql?(c)
+        end
+      end
     end
 
     if includes.kind_of?(Hash)
@@ -96,7 +109,7 @@ module MiqReport::Generator
       includes.each do |k, v|
         k = k.to_sym
         if k == :managed
-          result.merge!(:tags => {})
+          result[:tags] = {}
         else
           assoc_reflection = klass.reflect_on_association(k)
           assoc_klass = assoc_reflection.nil? ? nil : (assoc_reflection.options[:polymorphic] ? k : assoc_reflection.klass)
@@ -109,7 +122,7 @@ module MiqReport::Generator
 
           if assoc_klass && assoc_klass.respond_to?(:virtual_attribute?) && v["columns"]
             v["columns"].each do |c|
-              result[k][c.to_sym] = {} if assoc_klass.virtual_attribute?(c)
+              result[k][c.to_sym] = {} if assoc_klass.virtual_attribute?(c) && !assoc_klass.attribute_supported_by_sql?(c)
             end
           end
         end
@@ -129,7 +142,7 @@ module MiqReport::Generator
 
     sync = options.delete(:report_sync) || ::Settings.product.report_sync
 
-    task = MiqTask.create(:name => "Generate Report: '#{name}'")
+    task = MiqTask.create(:name => "Generate Report: '#{name}'", :userid => options[:userid])
 
     report_result = MiqReportResult.create(
       :name          => title,
@@ -274,6 +287,7 @@ module MiqReport::Generator
       # TODO: add once only_cols is fixed
       # targets = targets.select(only_cols)
       where_clause = MiqExpression.merge_where_clauses(self.where_clause, options[:where_clause])
+      ## add in virtual attributes that can be calculated from sql
       va_sql_cols = cols.select do |col|
         db_class.virtual_attribute?(col) && db_class.attribute_supported_by_sql?(col)
       end
@@ -391,7 +405,7 @@ module MiqReport::Generator
     result = build_apply_display_filter(result) unless display_filter.nil?
 
     @table = Ruport::Data::Table.new(:data => result, :column_names => column_names)
-    @table.reorder(column_names) unless @table.data.length == 0
+    @table.reorder(column_names) unless @table.data.empty?
 
     # Remove any resource columns that were added earlier to col_order so they won't appear in the report
     col_order.delete_if { |c| res_cols.include?(c) && !orig_col_order.include?(c) } if res_cols
@@ -421,7 +435,7 @@ module MiqReport::Generator
     only_cols = options[:only] || (self.cols + generate_cols + build_cols_from_include(include)).uniq
     column_names = result.empty? ? self.cols : result.first.keys
     @table = Ruport::Data::Table.new(:data => result, :column_names => column_names)
-    @table.reorder(only_cols) unless @table.data.length == 0
+    @table.reorder(only_cols) unless @table.data.empty?
 
     build_sort_table
   end
@@ -429,11 +443,11 @@ module MiqReport::Generator
   def get_data_from_report(rpt)
     raise _("Report table is nil") if rpt.table.nil?
 
-    rpt_data = if db_options[:row_col] && db_options[:row_val]
-                 rpt.table.find_all { |d| d.data.key?(db_options[:row_col]) && (d.data[db_options[:row_col]] == db_options[:row_val]) }.collect(&:data)
-               else
-                 rpt.table.collect(&:data)
-               end
+    if db_options[:row_col] && db_options[:row_val]
+      rpt.table.find_all { |d| d.data.key?(db_options[:row_col]) && (d.data[db_options[:row_col]] == db_options[:row_val]) }.collect(&:data)
+    else
+      rpt.table.collect(&:data)
+    end
   end
 
   def generate_rows_from_data(data)
@@ -501,7 +515,7 @@ module MiqReport::Generator
     while arr.first[1] == "[None]"; arr.push(arr.shift); end unless arr.blank? || (arr.first[1] == "[None]" && arr.last[1] == "[None]")
     arr.each { |c, h| self.cols.push(c); col_order.push(c); headers.push(h) }
 
-    tarr = Array(tags2desc).sort { |a, b| a[1] <=> b[1] }
+    tarr = Array(tags2desc).sort_by { |t| t[1] }
     while tarr.first[1] == "[None]"; tarr.push(tarr.shift); end unless tarr.blank? || (tarr.first[1] == "[None]" && tarr.last[1] == "[None]")
     self.extras[:group_by_tags] = tarr.collect { |a| a[0] }
     self.extras[:group_by_tag_descriptions] = tarr.collect { |a| a[1] }
@@ -516,7 +530,7 @@ module MiqReport::Generator
     klass = recs.first.class
     last_rec = nil
 
-    results = recs.sort { |a, b| a.resource_type + a.resource_id.to_s + a.timestamp.iso8601 <=> b.resource_type + b.resource_id.to_s + b.timestamp.iso8601 }.inject([]) do |arr, rec|
+    results = recs.sort_by { |r| [r.resource_type, r.resource_id.to_s, r.timestamp.iso8601] }.inject([]) do |arr, rec|
       last_rec ||= rec
       while (rec.timestamp - last_rec.timestamp) > int
         base_attrs = last_rec.attributes.reject { |k, _v| !base_cols.include?(k) }
@@ -806,7 +820,7 @@ module MiqReport::Generator
   end
 
   def table_has_records?
-    table.length > 0
+    !table.empty?
   end
 
   def queue_timeout

@@ -83,6 +83,24 @@ describe ManageIQ::Providers::Openshift::ContainerManager::Refresher do
     assert_container_node_with_no_hawk_attributes
   end
 
+  it 'will skip container_images if get_container_images = false' do
+    stub_settings(
+      :ems_refresh => {:openshift => {:get_container_images => false}},
+      :http_proxy  => {},
+      :ssl         => {}
+    )
+
+    VCR.use_cassette(described_class.name.underscore,
+                     :match_requests_on              => [:path,],
+                     :allow_unused_http_interactions => true) do # , :record => :new_episodes) do
+      EmsRefresh.refresh(@ems)
+    end
+
+    @ems.reload
+
+    expect(ContainerImage.count).to eq(12)
+  end
+
   def assert_table_counts
     expect(ContainerGroup.count).to eq(20)
     expect(ContainerNode.count).to eq(2)
@@ -95,7 +113,7 @@ describe ManageIQ::Providers::Openshift::ContainerManager::Refresher do
     expect(ContainerBuild.count).to eq(3)
     expect(ContainerBuildPod.count).to eq(3)
     expect(ContainerTemplate.count).to eq(26)
-    expect(ContainerImage.count).to eq(44)
+    expect(ContainerImage.count).to eq(40)
   end
 
   def assert_ems

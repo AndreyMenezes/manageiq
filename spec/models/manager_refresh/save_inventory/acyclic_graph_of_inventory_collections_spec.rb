@@ -64,8 +64,7 @@ describe ManagerRefresh::SaveInventory do
   #
   # Test all settings for ManagerRefresh::SaveInventory
   [{:inventory_object_saving_strategy => nil},
-   {:inventory_object_saving_strategy => :recursive},
-  ].each do |inventory_object_settings|
+   {:inventory_object_saving_strategy => :recursive},].each do |inventory_object_settings|
     context "with settings #{inventory_object_settings}" do
       before :each do
         @zone = FactoryGirl.create(:zone)
@@ -116,7 +115,8 @@ describe ManagerRefresh::SaveInventory do
               :ems_ref  => "vm_ems_ref_4",
               :name     => "vm_name_4",
               :location => "default_value_unknown",
-            })
+            }
+          )
         end
 
         it 'creates and updates a graph of InventoryCollections' do
@@ -155,7 +155,8 @@ describe ManagerRefresh::SaveInventory do
               :ems_ref  => "vm_ems_ref_4",
               :name     => "vm_name_4",
               :location => "default_value_unknown",
-            })
+            }
+          )
 
           # Fetch the created Vms from the DB, for comparing after second refresh
           vm1  = Vm.find_by(:ems_ref => "vm_ems_ref_1")
@@ -214,7 +215,8 @@ describe ManagerRefresh::SaveInventory do
               :ems_ref  => "vm_ems_ref_5",
               :name     => "vm_name_5",
               :location => "vm_location_5",
-            })
+            }
+          )
         end
       end
 
@@ -244,7 +246,8 @@ describe ManagerRefresh::SaveInventory do
               :ems_ref  => "vm_ems_ref_4",
               :name     => "vm_name_4",
               :location => "default_value_unknown",
-            })
+            }
+          )
 
           # Now save the records using InventoryCollections
           # Fill the InventoryCollections with data, that have a modified name
@@ -301,7 +304,8 @@ describe ManagerRefresh::SaveInventory do
               :ems_ref  => "vm_ems_ref_5",
               :name     => "vm_name_5",
               :location => "vm_location_5",
-            })
+            }
+          )
 
           assert_all_records_match_hashes(
             [Disk.all, @ems.disks],
@@ -321,7 +325,8 @@ describe ManagerRefresh::SaveInventory do
               :id          => @disk2.id,
               :hardware    => @hardware2,
               :device_type => "nvme_ssd_2"
-            })
+            }
+          )
 
           vm1  = Vm.find_by(:ems_ref => "vm_ems_ref_1")
           vm12 = Vm.find_by(:ems_ref => "vm_ems_ref_12")
@@ -347,6 +352,235 @@ describe ManagerRefresh::SaveInventory do
           expect(vm12.key_pairs.pluck(:id)).to match_array([@key_pair1.id, @key_pair12.id])
           expect(vm2.key_pairs.pluck(:id)).to match_array([@key_pair2.id])
         end
+
+        it "cleans up duplicates while" do
+          initialize_mocked_records
+
+          @vm1_dup1 = FactoryGirl.create(
+            :vm_cloud,
+            vm_data(1).merge(
+              :flavor                => @flavor_1,
+              :genealogy_parent      => @image1,
+              :key_pairs             => [@key_pair1],
+              :location              => 'host_10_10_10_1.com',
+              :ext_management_system => @ems,
+            )
+          )
+
+          @vm1_dup2 = FactoryGirl.create(
+            :vm_cloud,
+            vm_data(1).merge(
+              :flavor                => @flavor_1,
+              :genealogy_parent      => @image1,
+              :key_pairs             => [@key_pair1],
+              :location              => 'host_10_10_10_1.com',
+              :ext_management_system => @ems,
+            )
+          )
+
+          # Assert that the mocked data in the DB do have duplicate vm_ems_ref_1
+          assert_all_records_match_hashes(
+            [Vm.all, @ems.vms],
+            {
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_12",
+              :name     => "vm_name_12",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_2",
+              :name     => "vm_name_2",
+              :location => "host_10_10_10_2.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_4",
+              :name     => "vm_name_4",
+              :location => "default_value_unknown",
+            }
+          )
+
+          # Now save the records using InventoryCollections
+          # Fill the InventoryCollections with data, that have a modified name
+          initialize_data_and_inventory_collections
+          add_data_to_inventory_collection(@data[:vms],
+                                           @vm_data_1.merge(:name => "vm_name_1_changed"),
+                                           @vm_data_12.merge(:name => "vm_name_12_changed"),
+                                           @vm_data_2.merge(:name => "vm_name_2_changed"),
+                                           @vm_data_4.merge(:name => "vm_name_4_changed"),
+                                           vm_data(5))
+          add_data_to_inventory_collection(@data[:miq_templates], @image_data_1, @image_data_2, @image_data_3)
+          add_data_to_inventory_collection(@data[:key_pairs], @key_pair_data_1, @key_pair_data_12, @key_pair_data_2,
+                                           @key_pair_data_3)
+          add_data_to_inventory_collection(@data[:hardwares], @hardware_data_1, @hardware_data_2, @hardware_data_12)
+          add_data_to_inventory_collection(@data[:disks],
+                                           @disk_data_1.merge(:device_type => "nvme_ssd_1"),
+                                           @disk_data_12.merge(:device_type => "nvme_ssd_12"),
+                                           @disk_data_13.merge(:device_type => "nvme_ssd_13"),
+                                           @disk_data_2.merge(:device_type => "nvme_ssd_2"))
+          add_data_to_inventory_collection(@data[:networks], @public_network_data_1, @public_network_data_12,
+                                           @public_network_data_13, @public_network_data_14, @public_network_data_2)
+          add_data_to_inventory_collection(@data[:flavors], @flavor_data_1, @flavor_data_2, @flavor_data_3)
+
+          # Invoke the InventoryCollections saving
+          ManagerRefresh::SaveInventory.save_inventory(@ems, @data.values)
+
+          # Assert that saved data have the updated values and the duplicate vm_ems_ref_1 are gone
+          assert_all_records_match_hashes(
+            [Vm.all, @ems.vms],
+            {
+              :id       => anything, # There is no guarantee which duplicates are deleted
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1_changed",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :id       => @vm12.id,
+              :ems_ref  => "vm_ems_ref_12",
+              :name     => "vm_name_12_changed",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :id       => @vm2.id,
+              :ems_ref  => "vm_ems_ref_2",
+              :name     => "vm_name_2_changed",
+              :location => "host_10_10_10_2.com",
+            }, {
+              :id       => @vm4.id,
+              :ems_ref  => "vm_ems_ref_4",
+              :name     => "vm_name_4_changed",
+              :location => "default_value_unknown",
+            }, {
+              :id       => anything,
+              :ems_ref  => "vm_ems_ref_5",
+              :name     => "vm_name_5",
+              :location => "vm_location_5",
+            }
+          )
+        end
+
+        it "cleans up duplicates, leaving the one with service relation" do
+          initialize_mocked_records
+
+          service = FactoryGirl.create(:service)
+          # Add service to this Vm1
+          service.add_resource!(@vm1)
+
+          @vm1_dup1 = FactoryGirl.create(
+            :vm_cloud,
+            vm_data(1).merge(
+              :flavor                => @flavor_1,
+              :genealogy_parent      => @image1,
+              :key_pairs             => [@key_pair1],
+              :location              => 'host_10_10_10_1_dup_1.com',
+              :ext_management_system => @ems,
+            )
+          )
+
+          @vm1_dup2 = FactoryGirl.create(
+            :vm_cloud,
+            vm_data(1).merge(
+              :flavor                => @flavor_1,
+              :genealogy_parent      => @image1,
+              :key_pairs             => [@key_pair1],
+              :location              => 'host_10_10_10_1_dup_2.com',
+              :ext_management_system => @ems,
+            )
+          )
+
+          # Assert that the mocked data in the DB have the duplicates
+          assert_all_records_match_hashes(
+            [Vm.all, @ems.vms],
+            {
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1",
+              :location => "host_10_10_10_1_dup_1.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1",
+              :location => "host_10_10_10_1_dup_2.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_12",
+              :name     => "vm_name_12",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_2",
+              :name     => "vm_name_2",
+              :location => "host_10_10_10_2.com",
+            }, {
+              :ems_ref  => "vm_ems_ref_4",
+              :name     => "vm_name_4",
+              :location => "default_value_unknown",
+            }
+          )
+
+          # Now save the records using InventoryCollections
+          # Fill the InventoryCollections with data, that have a modified name
+          initialize_data_and_inventory_collections
+          add_data_to_inventory_collection(@data[:vms],
+                                           @vm_data_1.merge(:name => "vm_name_1_changed"),
+                                           @vm_data_12.merge(:name => "vm_name_12_changed"),
+                                           @vm_data_2.merge(:name => "vm_name_2_changed"),
+                                           @vm_data_4.merge(:name => "vm_name_4_changed"),
+                                           vm_data(5))
+          add_data_to_inventory_collection(@data[:miq_templates], @image_data_1, @image_data_2, @image_data_3)
+          add_data_to_inventory_collection(@data[:key_pairs], @key_pair_data_1, @key_pair_data_12, @key_pair_data_2,
+                                           @key_pair_data_3)
+          add_data_to_inventory_collection(@data[:hardwares], @hardware_data_1, @hardware_data_2, @hardware_data_12)
+          add_data_to_inventory_collection(@data[:disks],
+                                           @disk_data_1.merge(:device_type => "nvme_ssd_1"),
+                                           @disk_data_12.merge(:device_type => "nvme_ssd_12"),
+                                           @disk_data_13.merge(:device_type => "nvme_ssd_13"),
+                                           @disk_data_2.merge(:device_type => "nvme_ssd_2"))
+          add_data_to_inventory_collection(@data[:networks], @public_network_data_1, @public_network_data_12,
+                                           @public_network_data_13, @public_network_data_14, @public_network_data_2)
+          add_data_to_inventory_collection(@data[:flavors], @flavor_data_1, @flavor_data_2, @flavor_data_3)
+
+          # Invoke the InventoryCollections saving
+          ManagerRefresh::SaveInventory.save_inventory(@ems, @data.values)
+
+          # Assert that saved data have the updated values and we kept the Vm with service association while deleting
+          # others
+          assert_all_records_match_hashes(
+            [Vm.all, @ems.vms],
+            {
+              :id       => @vm1.id, # The vm with service relation remains in the DB
+              :ems_ref  => "vm_ems_ref_1",
+              :name     => "vm_name_1_changed",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :id       => @vm12.id,
+              :ems_ref  => "vm_ems_ref_12",
+              :name     => "vm_name_12_changed",
+              :location => "host_10_10_10_1.com",
+            }, {
+              :id       => @vm2.id,
+              :ems_ref  => "vm_ems_ref_2",
+              :name     => "vm_name_2_changed",
+              :location => "host_10_10_10_2.com",
+            }, {
+              :id       => @vm4.id,
+              :ems_ref  => "vm_ems_ref_4",
+              :name     => "vm_name_4_changed",
+              :location => "default_value_unknown",
+            }, {
+              :id       => anything,
+              :ems_ref  => "vm_ems_ref_5",
+              :name     => "vm_name_5",
+              :location => "vm_location_5",
+            }
+          )
+        end
       end
 
       context "lazy_find vs find" do
@@ -354,14 +588,16 @@ describe ManagerRefresh::SaveInventory do
           # Initialize the InventoryCollections
           @data             = {}
           @data[:vms]       = ::ManagerRefresh::InventoryCollection.new(
-            ManageIQ::Providers::CloudManager::Vm,
+            :model_class => ManageIQ::Providers::CloudManager::Vm,
             :parent      => @ems,
-            :association => :vms)
+            :association => :vms
+          )
           @data[:hardwares] = ::ManagerRefresh::InventoryCollection.new(
-            Hardware,
+            :model_class => Hardware,
             :parent      => @ems,
             :association => :hardwares,
-            :manager_ref => [:vm_or_template])
+            :manager_ref => [:vm_or_template]
+          )
         end
 
         it "misses relation using find and loading data in a wrong order" do
@@ -431,11 +667,14 @@ describe ManagerRefresh::SaveInventory do
     vm4  = Vm.find_by(:ems_ref => "vm_ems_ref_4")
 
     expect(vm1.genealogy_parent).to(
-      eq(ManageIQ::Providers::CloudManager::Template.find_by(:ems_ref => "image_ems_ref_1")))
+      eq(ManageIQ::Providers::CloudManager::Template.find_by(:ems_ref => "image_ems_ref_1"))
+    )
     expect(vm12.genealogy_parent).to(
-      eq(ManageIQ::Providers::CloudManager::Template.find_by(:ems_ref => "image_ems_ref_1")))
+      eq(ManageIQ::Providers::CloudManager::Template.find_by(:ems_ref => "image_ems_ref_1"))
+    )
     expect(vm2.genealogy_parent).to(
-      eq(ManageIQ::Providers::CloudManager::Template.find_by(:ems_ref => "image_ems_ref_2")))
+      eq(ManageIQ::Providers::CloudManager::Template.find_by(:ems_ref => "image_ems_ref_2"))
+    )
     expect(vm4.genealogy_parent).to(eq(nil))
 
     expect(vm1.hardware.virtualization_type).to eq("virtualization_type_1")
@@ -472,38 +711,45 @@ describe ManagerRefresh::SaveInventory do
     # Initialize the InventoryCollections
     @data                 = {}
     @data[:vms]           = ::ManagerRefresh::InventoryCollection.new(
-      ManageIQ::Providers::CloudManager::Vm,
+      :model_class => ManageIQ::Providers::CloudManager::Vm,
       :parent      => @ems,
-      :association => :vms)
-    @data[:key_pairs]     = ::ManagerRefresh::InventoryCollection.new(
-      ManageIQ::Providers::CloudManager::AuthKeyPair,
+      :association => :vms
+    )
+    @data[:key_pairs] = ::ManagerRefresh::InventoryCollection.new(
+      :model_class => ManageIQ::Providers::CloudManager::AuthKeyPair,
       :parent      => @ems,
       :association => :key_pairs,
-      :manager_ref => [:name])
+      :manager_ref => [:name]
+    )
     @data[:miq_templates] = ::ManagerRefresh::InventoryCollection.new(
-      ManageIQ::Providers::CloudManager::Template,
+      :model_class => ManageIQ::Providers::CloudManager::Template,
       :parent      => @ems,
-      :association => :miq_templates)
-    @data[:hardwares]     = ::ManagerRefresh::InventoryCollection.new(
-      Hardware,
+      :association => :miq_templates
+    )
+    @data[:hardwares] = ::ManagerRefresh::InventoryCollection.new(
+      :model_class => Hardware,
       :parent      => @ems,
       :association => :hardwares,
-      :manager_ref => [:vm_or_template])
-    @data[:disks]         = ::ManagerRefresh::InventoryCollection.new(
-      Disk,
+      :manager_ref => [:vm_or_template]
+    )
+    @data[:disks] = ::ManagerRefresh::InventoryCollection.new(
+      :model_class => Disk,
       :parent      => @ems,
       :association => :disks,
-      :manager_ref => [:hardware, :device_name])
-    @data[:networks]      = ::ManagerRefresh::InventoryCollection.new(
-      Network,
+      :manager_ref => [:hardware, :device_name]
+    )
+    @data[:networks] = ::ManagerRefresh::InventoryCollection.new(
+      :model_class => Network,
       :parent      => @ems,
       :association => :networks,
-      :manager_ref => [:hardware, :description])
-    @data[:flavors]       = ::ManagerRefresh::InventoryCollection.new(
-      Flavor,
+      :manager_ref => [:hardware, :description]
+    )
+    @data[:flavors] = ::ManagerRefresh::InventoryCollection.new(
+      :model_class => Flavor,
       :parent      => @ems,
       :association => :flavors,
-      :manager_ref => [:name])
+      :manager_ref => [:name]
+    )
 
     # Get parsed data with the lazy_relations
     @flavor_data_1        = flavor_data(1)
@@ -624,26 +870,29 @@ describe ManagerRefresh::SaveInventory do
       image_hardware_data(1).merge(
         :guest_os       => "linux_generic_1",
         :vm_or_template => @image1
-      ))
+      )
+    )
     @image_hardware2 = FactoryGirl.create(
       :hardware,
       image_hardware_data(2).merge(
         :guest_os       => "linux_generic_2",
         :vm_or_template => @image2
-      ))
+      )
+    )
     @image_hardware3 = FactoryGirl.create(
       :hardware,
       image_hardware_data(3).merge(
         :guest_os       => "linux_generic_3",
         :vm_or_template => @image3
-      ))
+      )
+    )
 
     @key_pair1  = FactoryGirl.create(:auth_key_pair_cloud, key_pair_data(1).merge(:resource => @ems))
     @key_pair12 = FactoryGirl.create(:auth_key_pair_cloud, key_pair_data(12).merge(:resource => @ems))
     @key_pair2  = FactoryGirl.create(:auth_key_pair_cloud, key_pair_data(2).merge(:resource => @ems))
     @key_pair3  = FactoryGirl.create(:auth_key_pair_cloud, key_pair_data(3).merge(:resource => @ems))
 
-    @vm1  = FactoryGirl.create(
+    @vm1 = FactoryGirl.create(
       :vm_cloud,
       vm_data(1).merge(
         :flavor                => @flavor_1,
@@ -651,7 +900,8 @@ describe ManagerRefresh::SaveInventory do
         :key_pairs             => [@key_pair1],
         :location              => 'host_10_10_10_1.com',
         :ext_management_system => @ems,
-      ))
+      )
+    )
     @vm12 = FactoryGirl.create(
       :vm_cloud,
       vm_data(12).merge(
@@ -660,8 +910,9 @@ describe ManagerRefresh::SaveInventory do
         :key_pairs             => [@key_pair1, @key_pair12],
         :location              => 'host_10_10_10_1.com',
         :ext_management_system => @ems,
-      ))
-    @vm2  = FactoryGirl.create(
+      )
+    )
+    @vm2 = FactoryGirl.create(
       :vm_cloud,
       vm_data(2).merge(
         :flavor                => @flavor2,
@@ -669,73 +920,87 @@ describe ManagerRefresh::SaveInventory do
         :key_pairs             => [@key_pair2],
         :location              => 'host_10_10_10_2.com',
         :ext_management_system => @ems,
-      ))
-    @vm4  = FactoryGirl.create(
+      )
+    )
+    @vm4 = FactoryGirl.create(
       :vm_cloud,
       vm_data(4).merge(
         :location              => 'default_value_unknown',
-        :ext_management_system => @ems))
+        :ext_management_system => @ems
+      )
+    )
 
-    @hardware1  = FactoryGirl.create(
+    @hardware1 = FactoryGirl.create(
       :hardware,
       hardware_data(1).merge(
         :guest_os       => @image1.hardware.guest_os,
         :vm_or_template => @vm1
-      ))
+      )
+    )
     @hardware12 = FactoryGirl.create(
       :hardware,
       hardware_data(12).merge(
         :guest_os       => @image1.hardware.guest_os,
         :vm_or_template => @vm12
-      ))
-    @hardware2  = FactoryGirl.create(
+      )
+    )
+    @hardware2 = FactoryGirl.create(
       :hardware,
       hardware_data(2).merge(
         :guest_os       => @image2.hardware.guest_os,
         :vm_or_template => @vm2
-      ))
+      )
+    )
 
-    @disk1  = FactoryGirl.create(
+    @disk1 = FactoryGirl.create(
       :disk,
       disk_data(1).merge(
         :hardware => @hardware1,
-      ))
+      )
+    )
     @disk12 = FactoryGirl.create(
       :disk,
       disk_data(12).merge(
         :hardware => @hardware12,
-      ))
+      )
+    )
     @disk13 = FactoryGirl.create(
       :disk,
       disk_data(13).merge(
         :hardware => @hardware12,
-      ))
-    @disk2  = FactoryGirl.create(
+      )
+    )
+    @disk2 = FactoryGirl.create(
       :disk,
       disk_data(2).merge(
         :hardware => @hardware2,
-      ))
+      )
+    )
 
-    @public_network1  = FactoryGirl.create(
+    @public_network1 = FactoryGirl.create(
       :network,
       public_network_data(1).merge(
         :hardware => @hardware1,
-      ))
+      )
+    )
     @public_network12 = FactoryGirl.create(
       :network,
       public_network_data(12).merge(
         :hardware => @hardware12,
-      ))
+      )
+    )
     @public_network13 = FactoryGirl.create(
       :network,
       public_network_data(13).merge(
         :hardware    => @hardware12,
         :description => "public_2"
-      ))
-    @public_network2  = FactoryGirl.create(
+      )
+    )
+    @public_network2 = FactoryGirl.create(
       :network,
       public_network_data(2).merge(
         :hardware => @hardware2,
-      ))
+      )
+    )
   end
 end

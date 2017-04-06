@@ -45,6 +45,8 @@ class ExtManagementSystem < ApplicationRecord
   has_many :storages,       -> { distinct },          :through => :hosts
   has_many :ems_events,     -> { order "timestamp" }, :class_name => "EmsEvent",    :foreign_key => "ems_id",
                                                       :inverse_of => :ext_management_system
+  has_many :generated_events, -> { order "timestamp" }, :class_name => "EmsEvent", :foreign_key => "generating_ems_id",
+                                                          :inverse_of => :generating_ems
   has_many :policy_events,  -> { order "timestamp" }, :class_name => "PolicyEvent", :foreign_key => "ems_id"
 
   has_many :blacklisted_events, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
@@ -54,6 +56,7 @@ class ExtManagementSystem < ApplicationRecord
   has_many :resource_pools, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :customization_specs, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :storage_profiles,    :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
+  has_many :physical_servers,    :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
 
   has_one  :iso_datastore, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
 
@@ -397,14 +400,14 @@ class ExtManagementSystem < ApplicationRecord
     end
   end
 
-  def refresh_ems
+  def refresh_ems(opts = {})
     if missing_credentials?
       raise _("no %{table} credentials defined") % {:table => ui_lookup(:table => "ext_management_systems")}
     end
     unless authentication_status_ok?
       raise _("%{table} failed last authentication check") % {:table => ui_lookup(:table => "ext_management_systems")}
     end
-    EmsRefresh.queue_refresh(self)
+    EmsRefresh.queue_refresh(self, nil, opts)
   end
 
   def self.ems_infra_discovery_types

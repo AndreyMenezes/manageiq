@@ -11,6 +11,14 @@ module ManageIQ::Providers::Redhat::InfraManager::Vm::Operations::Snapshot
         unsupported_reason_add(:snapshots, unsupported_reason(:control))
       end
     end
+
+    supports :revert_to_snapshot do
+      unless allowed_to_revert?
+        unsupported_reason_add(:revert_to_snapshot, _("Revert is allowed only when vm is down. Current state is %{state}") % {:state => current_state})
+      end
+    end
+
+    supports_not :remove_all_snapshots, :reason => N_("Removing all snapshots is currently not supported")
   end
 
   def raw_create_snapshot(_name, desc, memory)
@@ -20,7 +28,7 @@ module ManageIQ::Providers::Redhat::InfraManager::Vm::Operations::Snapshot
   end
 
   def raw_remove_snapshot(snapshot_id)
-    snapshot = snapshots.find_by_id(snapshot_id)
+    snapshot = snapshots.find_by(:id => snapshot_id)
     raise _("Requested VM snapshot not found, unable to remove snapshot") unless snapshot
     with_snapshots_service(uid_ems) do |snapshots_service|
       snapshots_service.snapshot_service(snapshot.uid_ems).remove
@@ -28,7 +36,7 @@ module ManageIQ::Providers::Redhat::InfraManager::Vm::Operations::Snapshot
   end
 
   def raw_revert_to_snapshot(snapshot_id)
-    snapshot = snapshots.find_by_id(snapshot_id)
+    snapshot = snapshots.find_by(:id => snapshot_id)
     raise _("Requested VM snapshot not found, unable to RevertTo snapshot") unless snapshot
     with_snapshots_service(uid_ems) do |snapshots_service|
       snapshots_service.snapshot_service(snapshot.uid_ems).restore
@@ -41,15 +49,6 @@ module ManageIQ::Providers::Redhat::InfraManager::Vm::Operations::Snapshot
 
   def snapshot_description_required?
     true
-  end
-
-  def validate_remove_all_snapshots
-    {:available => false, :message => _("Removing all snapshots is currently not supported")}
-  end
-
-  def validate_revert_to_snapshot
-    {:available => allowed_to_revert?,
-     :message   => _("Revert is allowed only when vm is down. Current state is %{state}") % {:State => current_state}}
   end
 
   def allowed_to_revert?

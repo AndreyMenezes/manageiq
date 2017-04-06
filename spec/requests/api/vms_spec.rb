@@ -3,7 +3,6 @@
 #
 describe "Vms API" do
   let(:zone)       { FactoryGirl.create(:zone, :name => "api_zone") }
-  let(:miq_server) { FactoryGirl.create(:miq_server, :guid => miq_server_guid, :zone => zone) }
   let(:ems)        { FactoryGirl.create(:ems_vmware, :zone => zone) }
   let(:host)       { FactoryGirl.create(:host) }
 
@@ -27,6 +26,92 @@ describe "Vms API" do
 
   def update_raw_power_state(state, *vms)
     vms.each { |vm| vm.update_attributes!(:raw_power_state => state) }
+  end
+
+  context 'Vm edit' do
+    let(:new_vms) { FactoryGirl.create_list(:vm_openstack, 2) }
+
+    before do
+      vm.set_child(vm_openstack)
+      vm.set_parent(vm_openstack1)
+    end
+
+    it 'cannot edit a VM without an appropriate role' do
+      api_basic_authorize
+
+      run_post(vms_url(vm.id), :action => 'edit')
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it 'can edit a VM with an appropriate role' do
+      api_basic_authorize collection_action_identifier(:vms, :edit)
+      children = new_vms.collect do |vm|
+        { 'href' => vms_url(vm.id) }
+      end
+
+      run_post(vms_url(vm.id), :action          => 'edit',
+                               :description     => 'bar',
+                               :child_resources => children,
+                               :custom_1        => 'foobar',
+                               :custom_9        => 'fizzbuzz',
+                               :parent_resource => { :href => vms_url(vm_openstack2.id) })
+
+      expected = {
+        'description' => 'bar'
+      }
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include(expected)
+      expect(vm.reload.children).to match_array(new_vms)
+      expect(vm.parent).to eq(vm_openstack2)
+      expect(vm.custom_1).to eq('foobar')
+      expect(vm.custom_9).to eq('fizzbuzz')
+    end
+
+    it 'only allows edit of custom_1, description, parent, and children' do
+      api_basic_authorize collection_action_identifier(:vms, :edit)
+
+      run_post(vms_url(vm.id), :action => 'edit', :name => 'foo', :autostart => true, :power_state => 'off')
+
+      expected = {
+        'error' => a_hash_including(
+          'kind'    => 'bad_request',
+          'message' => 'Cannot edit VM - Cannot edit values name, autostart, power_state'
+        )
+      }
+      expect(response).to have_http_status(:bad_request)
+      expect(response.parsed_body).to include(expected)
+    end
+
+    it 'can edit multiple vms' do
+      api_basic_authorize collection_action_identifier(:vms, :edit)
+
+      run_post(vms_url, :action => 'edit', :resources => [{ :id => vm.id, :description => 'foo' }, { :id => vm_openstack.id, :description => 'bar'}])
+
+      expected = {
+        'results' => [
+          a_hash_including('description' => 'foo'),
+          a_hash_including('description' => 'bar')
+        ]
+      }
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include(expected)
+    end
+
+    it 'requires a valid child/parent relationship ' do
+      api_basic_authorize collection_action_identifier(:vms, :edit)
+
+      run_post(vms_url(vm.id), :action => 'edit', :parent_resource => { :href => users_url(10) })
+
+      expected = {
+        'error' => a_hash_including(
+          'kind'    => 'bad_request',
+          'message' => 'Cannot edit VM - Invalid relationship type users'
+        )
+      }
+      expect(response).to have_http_status(:bad_request)
+      expect(response.parsed_body).to include(expected)
+    end
   end
 
   context "Vm accounts subcollection" do
@@ -1220,6 +1305,18 @@ describe "Vms API" do
 
       expect_query_result(:tags, 2, Tag.count)
       expect_result_resources_to_include_data("resources", "name" => [tag1[:path], tag2[:path]])
+    end
+
+    it "query vms by tag name via filter[]=tags.name" do
+      api_basic_authorize collection_action_identifier(:vms, :read, :get)
+      # let's make sure both vms are created
+      vm1
+      vm2
+
+      run_get vms_url, :expand => "resources", :filter => ["tags.name='#{tag2[:path]}'"]
+
+      expect_query_result(:vms, 1, 2)
+      expect_result_resources_to_include_hrefs("resources", [vm2_url])
     end
 
     it "assigns a tag to a Vm without appropriate role" do

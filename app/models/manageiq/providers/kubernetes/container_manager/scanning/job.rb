@@ -3,7 +3,7 @@ require 'kubeclient'
 
 class ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job < Job
   PROVIDER_CLASS = ManageIQ::Providers::Kubernetes::ContainerManager
-  INSPECTOR_NAMESPACE_FALLBACK = 'management-infra'
+  INSPECTOR_IMAGE_TAG = '2.1'.freeze
   INSPECTOR_PORT = 8080
   DOCKER_SOCKET = '/var/run/docker.sock'
   SCAN_CATEGORIES = %w(system software)
@@ -48,7 +48,6 @@ class ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job < Job
     return queue_signal(:abort_job, "cannot analyze non docker images", "error") unless image.docker_id
 
     namespace = ::Settings.ems.ems_kubernetes.miq_namespace
-    namespace = INSPECTOR_NAMESPACE_FALLBACK if namespace.blank?
 
     update!(:options => options.merge(
       :docker_image_id => image.docker_id,
@@ -88,7 +87,8 @@ class ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job < Job
     health_url   = pod_proxy_url(client, INSPECTOR_HEALTH_PATH)
     http_options = {
       :use_ssl     => health_url.scheme == 'https',
-      :verify_mode => ext_management_system.verify_ssl_mode
+      :verify_mode => ext_management_system.verify_ssl_mode,
+      :cert_store  => ext_management_system.ssl_cert_store,
     }
 
     # TODO: move this to a more appropriate place (lib)
@@ -157,6 +157,10 @@ class ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job < Job
   end
 
   def collect_compliance_data(image)
+    unless OpenscapResult.openscap_available?
+      _log.warn "OpenSCAP Binary missing, skipping scan"
+      return nil
+    end
     _log.info "collecting compliance data for #{options[:docker_image_id]}"
     openscap_result = image.openscap_result || OpenscapResult.new(:container_image => image)
     openscap_result.attach_raw_result(image_inspector_client.fetch_oscap_arf)
@@ -278,7 +282,10 @@ class ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job < Job
     ImageInspectorClient::Client.new(
       pod_proxy_url(kubeclient, ''),
       'v1',
-      :ssl_options    => kubeclient.ssl_options,
+      :ssl_options    => {
+        :verify_ssl => ext_management_system.verify_ssl_mode,
+        :cert_store => ext_management_system.ssl_cert_store
+      },
       :auth_options   => kubeclient.auth_options,
       :http_proxy_uri => kubeclient.http_proxy_uri
     )
@@ -358,7 +365,8 @@ class ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job < Job
           'manageiq.org' => "true"
         },
         :annotations => {
-          'manageiq.org/hostname' => options[:miq_server_host],
+          # in case hostname is not set and options[:miq_server_host] is nil, change ""
+          'manageiq.org/hostname' => options[:miq_server_host] || "unknown",
           'manageiq.org/guid'     => options[:miq_server_guid],
           'manageiq.org/image'    => options[:image_full_name],
           'manageiq.org/jobid'    => jobid,
@@ -415,7 +423,9 @@ class ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job < Job
   end
 
   def inspector_image
-    'docker.io/openshift/image-inspector:2.1'
+    registry = ::Settings.ems.ems_kubernetes.image_inspector_registry
+    repo = ::Settings.ems.ems_kubernetes.image_inspector_repository
+    "#{registry}/#{repo}:#{INSPECTOR_IMAGE_TAG}"
   end
 
   def inspector_proxy_env_variables

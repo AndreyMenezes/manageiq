@@ -31,17 +31,9 @@ module Api
       end
 
       def validate_optional_collection_classes
-        @collection_klasses = {}  # Default all to config classes
-        param = params['provider_class']
-        return unless param.present?
-
-        raise BadRequestError, "Unsupported provider_class #{param} specified" if param != "provider"
-        %w(tags policies policy_profiles).each do |cname|
-          if @req.subcollection == cname || @req.expand?(cname)
-            raise BadRequestError, "Management of #{cname} is unsupported for the Provider class"
-          end
-        end
-        @collection_klasses[:providers] = Provider
+        @collection_klasses = {} # Default all to config classes
+        validate_provider_class
+        validate_collection_class
       end
 
       def validate_api_action
@@ -148,8 +140,8 @@ module Api
 
       def parse_ownership(data)
         {
-          :owner => collection_class(:users).find_by_id(parse_owner(data["owner"])),
-          :group => collection_class(:groups).find_by_id(parse_group(data["group"]))
+          :owner => collection_class(:users).find_by(:id => parse_owner(data["owner"])),
+          :group => collection_class(:groups).find_by(:id => parse_group(data["group"]))
         }.compact if data.present?
       end
 
@@ -215,7 +207,12 @@ module Api
                         else
                           [@req.subject, request_type_target.last]
                         end
-        aspec = collection_config.typed_collection_actions(cname, target)
+        aspec = if @req.subcollection?
+                  collection_config.typed_subcollection_actions(@req.collection, cname, target) ||
+                    collection_config.typed_collection_actions(cname, target)
+                else
+                  collection_config.typed_collection_actions(cname, target)
+                end
         return if method_name == :get && aspec.nil?
         action_hash = fetch_action_hash(aspec, method_name, action_name)
         raise BadRequestError, "Disabled action #{action_name}" if action_hash[:disabled]
@@ -235,7 +232,12 @@ module Api
       def validate_post_api_action(cname, mname, type, target)
         aname = @req.action
 
-        aspec = collection_config.typed_collection_actions(cname, target)
+        aspec = if @req.subcollection?
+                  collection_config.typed_subcollection_actions(@req.collection, cname, target) ||
+                    collection_config.typed_collection_actions(cname, target)
+                else
+                  collection_config.typed_collection_actions(cname, target)
+                end
         raise BadRequestError, "No actions are supported for #{cname} #{type}" unless aspec
 
         action_hash = fetch_action_hash(aspec, mname, aname)
@@ -289,7 +291,7 @@ module Api
         return if cname == @req.collection
         return if collection_config.subcollection_denied?(@req.collection, cname)
 
-        aspec = collection_config.typed_subcollection_actions(@req.collection, cname)
+        aspec = collection_config.typed_subcollection_actions(@req.collection, cname, @req.s_id ? :subresource : :subcollection)
         return unless aspec
 
         action_hash = fetch_action_hash(aspec, mname, aname)
@@ -320,6 +322,35 @@ module Api
         unless missing_fields.empty?
           raise BadRequestError, "Resource #{missing_fields.join(", ")} needs be specified for creating a new #{type}"
         end
+      end
+
+      def validate_provider_class
+        param = params['provider_class']
+        return unless param.present?
+
+        raise BadRequestError, "Unsupported provider_class #{param} specified" if param != "provider"
+        %w(tags policies policy_profiles).each do |cname|
+          if @req.subcollection == cname || @req.expand?(cname)
+            raise BadRequestError, "Management of #{cname} is unsupported for the Provider class"
+          end
+        end
+        @collection_klasses[:providers] = Provider
+      end
+
+      def validate_collection_class
+        param = params['collection_class']
+        return unless param.present?
+
+        klass = collection_class(@req.collection)
+        return if param == klass.name
+
+        param_klass = klass.descendants.detect { |sub_klass| param == sub_klass.name }
+        if param_klass.present?
+          @collection_klasses[@req.collection.to_sym] = param_klass
+          return
+        end
+
+        raise BadRequestError, "Invalid collection_class #{param} specified for the #{@req.collection} collection"
       end
     end
   end

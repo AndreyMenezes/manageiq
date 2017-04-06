@@ -11,6 +11,7 @@
   - about
   - all_vm_rules
   - automation_manager
+  - embedded_automation_manager
   - availability_zone
   - host_aggregate
   - compute
@@ -24,6 +25,8 @@
   - ontap_storage_volume
   - catalog
   - cloud_network
+  - cloud_object_store_container
+  - cloud_object_store_object
   - control_explorer
   - dashboard
   - datacenter
@@ -190,6 +193,7 @@
   - usage
   - vm_check_compliance
   - vm_console
+  - vm_webmks_console
   - vm_cloud_explorer
   - vm_explorer
   - vm_infra_explorer
@@ -211,6 +215,7 @@
   - about
   - all_vm_rules
   - automation_manager
+  - embedded_automation_manager
   - bottlenecks
   - compute
   - chargeback
@@ -304,6 +309,7 @@
   - utilization
   - vm_check_compliance
   - vm_console
+  - vm_webmks_console
   - vm_cloud_explorer
   - vm_explorer
   - vm_infra_explorer
@@ -346,6 +352,7 @@
   - vm_clone
   - vm_compare
   - vm_console
+  - vm_webmks_console
   - vm_cloud_explorer
   - vm_explorer
   - vm_infra_explorer
@@ -378,6 +385,7 @@
   - about
   - all_vm_rules
   - automation_manager
+  - embedded_automation_manager
   - compute
   - chargeback
   - chargeback_reports
@@ -492,6 +500,7 @@
   - vm_collect_running_processes
   - vm_compare
   - vm_console
+  - vm_webmks_console
   - vm_cloud_explorer
   - vm_explorer
   - vm_infra_explorer
@@ -703,6 +712,7 @@
   - vm_check_compliance
   - vm_collect_running_processes
   - vm_console
+  - vm_webmks_console
   - vm_cloud_explorer
   - vm_explorer
   - vm_infra_explorer
@@ -798,6 +808,7 @@
   - usage
   - vm_check_compliance
   - vm_console
+  - vm_webmks_console
   - vm_cloud_explorer
   - vm_explorer
   - vm_infra_explorer
@@ -864,6 +875,7 @@
   - about
   - all_vm_rules
   - automation_manager
+  - embedded_automation_manager
   - compute
   - miq_template_clone
   - miq_template_drift
@@ -889,9 +901,11 @@
   - service_view
   - svc_catalog_provision
   - vm_console
+  - vm_webmks_console
   - vm_clone
   - vm_cloud_explorer
   - vm_console
+  - vm_webmks_console
   - vm_drift
   - vm_edit
   - vm_filter_accord
@@ -927,6 +941,7 @@
   - about
   - all_vm_rules
   - automation_manager
+  - embedded_automation_manager
   - compute
   - miq_request_admin
   - miq_request_view
@@ -952,6 +967,7 @@
   - vm_collect_running_processes
   - vm_compare
   - vm_console
+  - vm_webmks_console
   - vm_drift
   - vm_explorer
   - vm_guest_restart
@@ -986,6 +1002,7 @@
   :miq_product_feature_identifiers:
   - about
   - automation_manager
+  - embedded_automation_manager
   - availability_zone
   - host_aggregate
   - all_vm_rules
@@ -1059,6 +1076,7 @@
   :miq_product_feature_identifiers:
   - about
   - automation_manager
+  - embedded_automation_manager
   - availability_zone
   - host_aggregate
   - all_vm_rules

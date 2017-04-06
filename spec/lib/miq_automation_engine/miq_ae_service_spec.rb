@@ -107,47 +107,6 @@ module MiqAeServiceSpec
   end
 
   describe MiqAeService do
-    context "service models" do
-      it "expose all expected active_record models as service_models" do
-        excluded_model_names = %w(
-          AuthToken
-          AuthUseridPassword
-          Category
-          Datacenter
-          ManageIQ::Providers::BaseManager
-          ManageIQ::Providers::PhysicalInfraManager
-          ManageIQ::Providers::Kubernetes::ContainerManager::Scanning::Job
-          VmServer
-          VmSynchronize
-        )
-
-        base_models = MiqAeMethodService::MiqAeServiceModelBase.service_models
-                                                               .collect(&:ar_base_model).uniq!
-
-        # Determine descendants for all base_models of service models
-        all_models = base_models.dup
-        base_models.each { |bm| all_models += bm.descendants }
-        all_models.uniq!
-        all_models.delete_if { |klass| klass.name.nil? } # Ignore anonymous classes loaded from tests
-        all_models.sort_by!(&:name)
-
-        failed_models = []
-        all_models.each do |ar_model|
-          next if excluded_model_names.include?(ar_model.name)
-
-          begin
-            MiqAeMethodService::MiqAeServiceModelBase.model_name_from_active_record_model(ar_model).constantize
-          rescue NameError
-            failed_models << ar_model.name # Collect all failing model names
-          end
-        end
-
-        expect(failed_models).to eq([])
-      end
-    end
-  end
-
-  describe MiqAeService do
     context "#prepend_namespace=" do
       let(:options) { {} }
       let(:workspace) { double("MiqAeEngine::MiqAeWorkspaceRuntime", :root => options) }
@@ -247,6 +206,33 @@ module MiqAeServiceSpec
           result = miq_ae_service.create_notification(:level => 'success', :audience => 'global', :message => 'test')
           expect(result).to be_kind_of(MiqAeMethodService::MiqAeServiceNotification)
         end
+      end
+    end
+
+    context "#create_service_provision_request" do
+      let(:options) { {:fred => :flintstone} }
+      let(:svc_options) { {:dialog_style => "medium"} }
+      let(:user) { FactoryGirl.create(:user_with_group) }
+      let(:template) { FactoryGirl.create(:service_template_ansible_playbook) }
+      let(:miq_request) { FactoryGirl.create(:service_template_provision_request) }
+      let(:svc_template) do
+        MiqAeMethodService::MiqAeServiceServiceTemplate.find(template.id)
+      end
+      let(:workspace) do
+        double("MiqAeEngine::MiqAeWorkspaceRuntime",
+               :root               => options,
+               :persist_state_hash => {},
+               :ae_user            => user)
+      end
+      let(:miq_ae_service) { MiqAeService.new(workspace) }
+
+      it "create service request" do
+        allow(workspace).to receive(:disable_rbac)
+        expect(svc_template).to receive(:instance_variable_get).with('@object').and_return(template)
+        expect(template).to receive(:provision_request).with(user, svc_options).and_return(miq_request)
+
+        result = miq_ae_service.create_service_provision_request(svc_template, svc_options)
+        expect(result).to be_kind_of(MiqAeMethodService::MiqAeServiceMiqRequest)
       end
     end
   end

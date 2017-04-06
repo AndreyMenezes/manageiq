@@ -101,34 +101,34 @@ describe ServiceTemplateOrchestration do
     end
   end
 
-  describe '#create_catalog_item' do
-    let(:ra1) { FactoryGirl.create(:resource_action, :action => 'Provision') }
-    let(:ra2) { FactoryGirl.create(:resource_action, :action => 'Retirement') }
-    let(:service_dialog) { FactoryGirl.create(:dialog) }
-    let(:template) { FactoryGirl.create(:orchestration_template) }
-    let(:manager) { FactoryGirl.create(:ext_management_system) }
-    let(:catalog_item_options) do
-      {
-        :name         => 'Orchestration Template',
-        :service_type => 'atomic',
-        :prov_type    => 'generic_orchestration',
-        :display      => 'false',
-        :description  => 'a description',
-        :config_info  => {
-          :template_id => template.id,
-          :manager_id  => manager.id,
-          :provision   => {
-            :fqname    => ra1.fqname,
-            :dialog_id => service_dialog.id
-          },
-          :retirement  => {
-            :fqname    => ra2.fqname,
-            :dialog_id => service_dialog.id
-          }
+  let(:ra1) { FactoryGirl.create(:resource_action, :action => 'Provision') }
+  let(:ra2) { FactoryGirl.create(:resource_action, :action => 'Retirement') }
+  let(:service_dialog) { FactoryGirl.create(:dialog) }
+  let(:template) { FactoryGirl.create(:orchestration_template) }
+  let(:manager) { FactoryGirl.create(:ext_management_system) }
+  let(:catalog_item_options) do
+    {
+      :name         => 'Orchestration Template',
+      :service_type => 'atomic',
+      :prov_type    => 'generic_orchestration',
+      :display      => 'false',
+      :description  => 'a description',
+      :config_info  => {
+        :template_id => template.id,
+        :manager_id  => manager.id,
+        :provision   => {
+          :fqname    => ra1.fqname,
+          :dialog_id => service_dialog.id
+        },
+        :retirement  => {
+          :fqname    => ra2.fqname,
+          :dialog_id => service_dialog.id
         }
       }
-    end
+    }
+  end
 
+  describe '.create_catalog_item' do
     it 'creates and returns an orchestration service template' do
       service_template = ServiceTemplateOrchestration.create_catalog_item(catalog_item_options)
       service_template.reload
@@ -138,6 +138,7 @@ describe ServiceTemplateOrchestration do
       expect(service_template.orchestration_template).to eq(template)
       expect(service_template.orchestration_manager).to eq(manager)
       expect(service_template.resource_actions.pluck(:action)).to include('Provision', 'Retirement')
+      expect(service_template.config_info).to eq(catalog_item_options[:config_info])
     end
 
     it 'requires both a template_id and manager_id' do
@@ -162,6 +163,89 @@ describe ServiceTemplateOrchestration do
       service_template = ServiceTemplateOrchestration.create_catalog_item(catalog_item_options)
       expect(service_template.orchestration_template).to eq(template)
       expect(service_template.orchestration_manager).to eq(manager)
+    end
+  end
+
+  describe '#update_catalog_item' do
+    let(:new_template) { FactoryGirl.create(:orchestration_template) }
+    let(:new_manager) { FactoryGirl.create(:ext_management_system) }
+    let(:updated_catalog_item_options) do
+      {
+        :name        => 'Updated Orchestration Template',
+        :display     => 'false',
+        :description => 'a description',
+        :config_info => {
+          :template_id => new_template.id,
+          :manager_id  => new_manager.id,
+          :provision   => {
+            :fqname    => ra1.fqname,
+            :dialog_id => service_dialog.id
+          },
+          :reconfigure => {
+            :fqname    => ra2.fqname,
+            :dialog_id => service_dialog.id
+          }
+        }
+      }
+    end
+
+    before do
+      @catalog_item = ServiceTemplateOrchestration.create_catalog_item(catalog_item_options)
+    end
+
+    it 'updates the catalog item' do
+      updated = @catalog_item.update_catalog_item(updated_catalog_item_options)
+
+      expect(updated.name).to eq('Updated Orchestration Template')
+      expect(updated.config_info).to eq(updated_catalog_item_options[:config_info])
+      expect(updated.orchestration_template).to eq(new_template)
+      expect(updated.orchestration_manager).to eq(new_manager)
+      expect(updated.resource_actions.pluck(:action)).to match_array(%w(Provision Reconfigure))
+    end
+
+    it 'requires both template and manager id' do
+      updated_catalog_item_options[:config_info].delete(:manager_id)
+      expect do
+        @catalog_item.update_catalog_item(updated_catalog_item_options)
+      end.to raise_error(StandardError, 'Must provide both template_id and manager_id or manager and template')
+    end
+
+    it 'can accept manager and template objects on update' do
+      updated_catalog_item_options[:config_info].delete(:manager_id)
+      updated_catalog_item_options[:config_info].delete(:manager_id)
+      updated_catalog_item_options[:config_info].merge!(:template => new_template, :manager => new_manager)
+      updated = @catalog_item.update_catalog_item(updated_catalog_item_options)
+
+      expect(updated.orchestration_template).to eq(new_template)
+      expect(updated.orchestration_manager).to eq(new_manager)
+    end
+
+    it 'allows for update without the presence of config_info' do
+      expect do
+        @catalog_item.update_catalog_item(:name => 'new_name')
+      end.to change(@catalog_item, :name)
+      expect(@catalog_item.reload.name).to eq('new_name')
+    end
+  end
+
+  describe '#config_info' do
+    it 'returns the correct format' do
+      template = FactoryGirl.create(:orchestration_template)
+      manager = FactoryGirl.create(:ext_management_system)
+      service_template = FactoryGirl.create(:service_template_orchestration,
+                                            :orchestration_template => template,
+                                            :orchestration_manager  => manager)
+      ra = FactoryGirl.create(:resource_action, :action => 'Provision', :fqname => '/a/b/c')
+      service_template.create_resource_actions(:provision => { :fqname => ra.fqname })
+
+      expected_config_info = {
+        :template_id => template.id,
+        :manager_id  => manager.id,
+        :provision   => {
+          :fqname => ra.fqname
+        }
+      }
+      expect(service_template.config_info).to eq(expected_config_info)
     end
   end
 end

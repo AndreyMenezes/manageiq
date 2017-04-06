@@ -30,13 +30,11 @@ module ManageIQ::Providers::Redhat::InfraManager::EventParser
     _log.debug { "#{log_header}event: [#{event.inspect}]" }
 
     # Connect back to RHEV to get the actual user_name
-    ems       = ManageIQ::Providers::Redhat::InfraManager.find_by_id(ems_id)
+    ems       = ManageIQ::Providers::Redhat::InfraManager.find_by(:id => ems_id)
     user_href = ems_ref_from_object_in_event(event[:user])
     username  = nil
     if ems && user_href
-      ems.with_provider_connection do |rhevm|
-        username = Ovirt::User.find_by_href(rhevm, user_href).try(:[], :user_name)
-      end
+      username = ems.ovirt_services.username_by_href(user_href)
     end
 
     # Build the event hash
@@ -62,10 +60,7 @@ module ManageIQ::Providers::Redhat::InfraManager::EventParser
   def self.parse_new_target(full_data, message, ems, event_type)
     cluster = full_data[:cluster]
     cluster_ref = ManageIQ::Providers::Redhat::InfraManager.make_ems_ref(cluster[:href])
-
-    cluster_name = ems.with_provider_connection do |rhevm|
-      Ovirt::Cluster.find_by_href(rhevm, cluster_ref).try(:[], :name)
-    end
+    cluster_name = ems.ovirt_services.cluster_name_href(cluster_ref)
 
     {
       :ems_id         => ems.id,

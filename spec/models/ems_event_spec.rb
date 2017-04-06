@@ -1,4 +1,15 @@
 describe EmsEvent do
+  context "model" do
+    let(:ems1) { FactoryGirl.create(:ems_kubernetes) }
+    let(:ems2) { FactoryGirl.create(:ems_hawkular_datawarehouse) }
+
+    it "Find ems events and generated events for ext management systems" do
+      generated_event = FactoryGirl.create(:ems_event, :ext_management_system => ems1, :generating_ems => ems2)
+      expect(ems1.ems_events).to match_array([generated_event])
+      expect(ems2.generated_events).to match_array([generated_event])
+    end
+  end
+
   context "container events" do
     let(:ems_ref) { "test_ems_ref" }
 
@@ -185,6 +196,41 @@ describe EmsEvent do
           expect(new_event.availability_zone_id).to eq @availability_zone.id
         end
       end
+    end
+  end
+
+  context '.event_groups' do
+    let(:provider_event) { 'SomeSpecialProviderEvent' }
+
+    it 'returns a list of groups' do
+      event_group_names = [
+        :addition, :application, :configuration, :console, :deletion, :general, :import_export, :migration, :network,
+        :power, :snapshot, :status, :storage
+      ]
+      expect(described_class.event_groups.keys).to match_array(event_group_names)
+      expect(described_class.event_groups[:addition]).to include(:name => 'Creation/Addition')
+      expect(described_class.event_groups[:addition][:critical]).to include('CloneTaskEvent')
+      expect(described_class.event_groups[:addition][:critical]).not_to include(provider_event)
+    end
+
+    it 'returns the provider event if configured' do
+      stub_settings_merge(
+        :ems => {
+          :some_provider => {
+            :event_handling => {
+              :event_groups => {
+                :addition => {
+                  :critical => [provider_event]
+                }
+              }
+            }
+          }
+        }
+      )
+      allow(Vmdb::Plugins.instance).to receive(:registered_provider_plugin_names).and_return([:some_provider])
+
+      expect(described_class.event_groups[:addition][:critical]).to include('CloneTaskEvent')
+      expect(described_class.event_groups[:addition][:critical]).to include(provider_event)
     end
   end
 end

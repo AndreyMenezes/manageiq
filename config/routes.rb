@@ -15,11 +15,11 @@ Vmdb::Application.routes.draw do
 
     unless defined?(API_ACTIONS)
       API_ACTIONS = {
-        :get    => "show",
-        :post   => "update",
-        :put    => "update",
-        :patch  => "update",
-        :delete => "destroy",
+        :get     => "show",
+        :post    => "update",
+        :put     => "update",
+        :patch   => "update",
+        :delete  => "destroy",
         :options => "options"
       }.freeze
     end
@@ -35,7 +35,13 @@ Vmdb::Application.routes.draw do
           next unless collection.options.include?(:collection)
 
           if collection.options.include?(:arbitrary_resource_path)
-            match "(/*c_suffix)", :action => API_ACTIONS[verb], :via => verb
+            case verb
+            when :get
+              root :action => :index
+              get "/*c_suffix", :action => :show
+            else
+              match "(/*c_suffix)", :action => API_ACTIONS[verb], :via => verb
+            end
           else
             case verb
             when :get
@@ -69,7 +75,7 @@ Vmdb::Application.routes.draw do
 
   if Rails.env.development? && defined?(Rails::Server)
     logger = Logger.new(STDOUT)
-    logger.level = ::Settings.log.level_websocket
+    logger.level = Logger.const_get(::Settings.log.level_websocket.upcase)
     mount WebsocketServer.new(:logger => logger) => '/ws'
   end
 end

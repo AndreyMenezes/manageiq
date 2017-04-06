@@ -24,6 +24,7 @@ class MiqPolicy < ApplicationRecord
 
   validates_presence_of     :name, :description, :guid
   validates_uniqueness_of   :name, :description, :guid
+  validates :mode, :inclusion => { :in => %w(compliance control) }
 
   serialize :expression
 
@@ -101,11 +102,6 @@ class MiqPolicy < ApplicationRecord
       next unless pe.qualifier == on.to_s
       pe.get_action(on)
     end.compact
-  end
-
-  def action_result_for_event(action, event)
-    pe = miq_policy_contents.find_by(:miq_action => action, :miq_event_definition => event)
-    pe.qualifier == "success"
   end
 
   def delete_event(event)

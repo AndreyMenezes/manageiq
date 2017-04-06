@@ -10,7 +10,7 @@ class Host < ApplicationRecord
   include SupportsFeatureMixin
   include NewWithTypeStiMixin
   include TenantIdentityMixin
-  include SupportsFeatureMixin
+  include DeprecationMixin
 
   VENDOR_TYPES = {
     # DB            Displayed
@@ -91,16 +91,14 @@ class Host < ApplicationRecord
   has_many                  :host_aggregate_hosts, :dependent => :destroy
   has_many                  :host_aggregates, :through => :host_aggregate_hosts
 
-
-  #Physical infra reference
-  has_one :physical_server,  :foreign_key  =>  "serialNumber", :primary_key  =>  "service_tag", :class_name => "PhysicalServer"
+  # Physical server reference
+  belongs_to :physical_server, :inverse_of => :host
 
   serialize :settings, Hash
 
-  # TODO: Remove all callers of address
-  alias_attribute :address, :hostname
-  alias_attribute :state,   :power_state
-  alias_attribute :to_s,    :name
+  deprecate_attribute :address, :hostname
+  alias_attribute     :state,   :power_state
+  alias_attribute     :to_s,    :name
 
   include SerializedEmsRefObjMixin
   include ProviderObjectMixin
@@ -348,27 +346,11 @@ class Host < ApplicationRecord
     ipmi.send(verb)
   end
 
-  # request:   the event sent to automate for policy resolution
+  # event:   the event sent to automate for policy resolution
   # cb_method: the MiqQueue callback method along with the parameters that is called
   #            when automate process is done and the request is not prevented to proceed by policy
-  def check_policy_prevent(request, *cb_method)
-    cb = {:class_name  => self.class.to_s,
-          :instance_id => id,
-          :method_name => :check_policy_prevent_callback,
-          :args        => [*cb_method],
-          :server_guid => MiqServer.my_guid
-    }
-    MiqEvent.raise_evm_event(self, request, {:host => self}, :miq_callback => cb)
-  end
-
-  def check_policy_prevent_callback(*action, _status, _message, result)
-    prevented = false
-    if result.kind_of?(MiqAeEngine::MiqAeWorkspaceRuntime)
-      event = result.get_obj_from_path("/")['event_stream']
-      data  = event.attributes["full_data"]
-      prevented = data.fetch_path(:policy, :prevented) if data
-    end
-    prevented ? _log.info((event.attributes["message"]).to_s) : send(*action)
+  def check_policy_prevent(event, *cb_method)
+    MiqEvent.raise_evm_event(self, event, {:host => self}, {:miq_callback => prevent_callback_settings(*cb_method)})
   end
 
   def ipmi_power_on
@@ -1351,22 +1333,17 @@ class Host < ApplicationRecord
     Classification.first_cat_entry(name, self)
   end
 
-  # TODO: Rename this to scan_queue and rename scan_from_queue to scan to match
-  #   standard from other places.
-  def scan(userid = "system", _options = {})
+  def scan(userid = "system", options = {})
     log_target = "#{self.class.name} name: [#{name}], id: [#{id}]"
+    _log.info("Requesting scan of #{log_target}")
+    check_policy_prevent(:request_host_scan, :scan_queue, userid, options)
+  end
+
+  def scan_queue(userid = 'system', _options = {})
+    log_target = "#{self.class.name} name: [#{name}], id: [#{id}]"
+    _log.info("Queuing scan of #{log_target}")
 
     task = MiqTask.create(:name => "SmartState Analysis for '#{name}' ", :userid => userid)
-
-    _log.info("Requesting scan of #{log_target}")
-    begin
-      MiqEvent.raise_evm_job_event(self, :type => "scan", :prefix => "request")
-    rescue => err
-      _log.warn("Error raising request scan event for #{log_target}: #{err.message}")
-      return
-    end
-
-    _log.info("Queuing scan of #{log_target}")
     timeout = ::Settings.host_scan.queue_timeout.to_i_with_method
     cb = {:class_name => task.class.name, :instance_id => task.id, :method_name => :queue_callback_on_exceptions, :args => ['Finished']}
     MiqQueue.put(

@@ -1,6 +1,5 @@
 FactoryGirl.define do
   factory :authentication do
-    type        "AuthUseridPassword"
     userid      "testuser"
     password    "secret"
     authtype    "default"
@@ -20,7 +19,6 @@ FactoryGirl.define do
   end
 
   factory :authentication_ssh_keypair, :parent => :authentication, :class => 'ManageIQ::Providers::Openstack::InfraManager::AuthKeyPair' do
-    type        "ManageIQ::Providers::Openstack::InfraManager::AuthKeyPair"
     authtype    "ssh_keypair"
     userid      "testuser"
     password    nil
@@ -36,31 +34,26 @@ FactoryGirl.define do
     status      "SomeMockedStatus"
   end
 
-  factory :authentication_allow_all, :parent => :authentication do
-    type "AuthenticationAllowAll"
+  factory :authentication_allow_all, :parent => :authentication, :class => "AuthenticationAllowAll" do
     authtype "AllowAllPasswordIdentityProvider"
   end
 
-  factory :authentication_github, :parent => :authentication do
-    type "AuthenticationGithub"
+  factory :authentication_github, :parent => :authentication, :class => "AuthenticationGithub" do
     authtype "GitHubIdentityProvider"
     github_organizations ["github_organizations"]
   end
 
-  factory :authentication_google, :parent => :authentication do
-    type "AuthenticationGoogle"
+  factory :authentication_google, :parent => :authentication, :class => "AuthenticationGoogle" do
     authtype "GoogleIdentityProvider"
     google_hosted_domain "google_hosted_domain"
   end
 
-  factory :authentication_htpasswd, :parent => :authentication do
-    type "AuthenticationHtpasswd"
+  factory :authentication_htpasswd, :parent => :authentication, :class => "AuthenticationHtpasswd" do
     authtype "HTPasswdPasswordIdentityProvider"
     htpassd_users [{"htpassuser1" => "htpassword"}, {"htpassuser2" => "htpassword"}]
   end
 
-  factory :authentication_ldap, :parent => :authentication do
-    type "AuthenticationLdap"
+  factory :authentication_ldap, :parent => :authentication, :class => "AuthenticationLdap" do
     authtype "LDAPPasswordIdentityProvider"
     ldap_id ["ldap_id"]
     ldap_email ["ldap_email"]
@@ -72,8 +65,7 @@ FactoryGirl.define do
     certificate_authority "certificate_authority"
   end
 
-  factory :authentication_open_id, :parent => :authentication do
-    type "AuthenticationOpenId"
+  factory :authentication_open_id, :parent => :authentication, :class => "AuthenticationOpenId" do
     authtype "OpenIDIdentityProvider"
     open_id_sub_claim "open_id_sub_claim"
     open_id_user_info "open_id_user_info"
@@ -83,8 +75,7 @@ FactoryGirl.define do
     open_id_extra_authorize_parameters "open_id_extra_authorize_parameters"
   end
 
-  factory :authentication_request_header, :parent => :authentication do
-    type "AuthenticationRequestHeader"
+  factory :authentication_request_header, :parent => :authentication, :class => "AuthenticationRequestHeader" do
     authtype "RequestHeaderIdentityProvider"
     request_header_challenge_url "request_header_challenge_url"
     request_header_login_url "request_header_login_url"
@@ -99,7 +90,23 @@ FactoryGirl.define do
     authtype "metrics"
   end
 
-  factory :auth_token do
-    type "AuthToken"
-  end
+  factory :automation_manager_authentication,
+          :parent => :authentication,
+          :class  => "ManageIQ::Providers::AutomationManager::Authentication"
+
+  factory :embedded_automation_manager_authentication,
+          :parent => :authentication,
+          :class  => "ManageIQ::Providers::EmbeddedAutomationManager::Authentication"
+
+  factory :ansible_cloud_credential,
+          :parent => :automation_manager_authentication,
+          :class  => "ManageIQ::Providers::AnsibleTower::AutomationManager::CloudCredential"
+
+  factory :ansible_machine_credential,
+          :parent => :automation_manager_authentication,
+          :class  => "ManageIQ::Providers::AnsibleTower::AutomationManager::MachineCredential"
+
+  factory :ansible_network_credential,
+          :parent => :automation_manager_authentication,
+          :class  => "ManageIQ::Providers::AnsibleTower::AutomationManager::NetworkCredential"
 end

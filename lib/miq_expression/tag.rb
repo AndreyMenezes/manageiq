@@ -1,17 +1,25 @@
-class MiqExpression::Tag
-  def self.parse(tag)
-    klass, ns = tag.split(".")
-    klass, ns = "nil", klass if ns.nil? # support managed-label
-    ns = "/" + ns.split("-").join("/")
-    ns = ns.sub(/(\/user_tag\/)/, "/user/") # replace with correct namespace for user tags
-    new(klass.safe_constantize, ns)
+class MiqExpression::Tag < MiqExpression::Target
+  REGEX = /
+(?<model_name>([[:alnum:]]*(::)?)+)
+\.(?<associations>([a-z_]+\.)*)
+(?<namespace>\bmanaged|user_tag\b)
+-(?<column>[a-z]+[_[:alnum:]]+)
+/x
+
+  MANAGED_NAMESPACE      = 'managed'.freeze
+  USER_NAMESPACE         = 'user'.freeze
+
+  attr_reader :namespace
+
+  def self.parse(field)
+    parsed_params = parse_params(field) || return
+    managed = parsed_params[:namespace] == self::MANAGED_NAMESPACE
+    new(parsed_params[:model_name], parsed_params[:associations], parsed_params[:column], managed)
   end
 
-  attr_reader :model, :namespace
-
-  def initialize(model, namespace)
-    @model = model
-    @namespace = namespace
+  def initialize(model, associations, column, managed = true)
+    super(model, associations, column)
+    @namespace = "/#{managed ? MANAGED_NAMESPACE : USER_NAMESPACE}/#{column}"
   end
 
   def contains(value)
@@ -34,9 +42,4 @@ class MiqExpression::Tag
   def attribute_supported_by_sql?
     false
   end
-
-  def eql?(other)
-    other.try(:model) == model && other.try(:namespace) == namespace
-  end
-  alias == eql?
 end

@@ -20,7 +20,8 @@ class MiqAction < ApplicationRecord
               "set_custom_attribute"    => "Set a Custom Attribute in vCenter",
               "inherit_parent_tags"     => "Inherit Parent Tags",
               "remove_tags"             => "Remove Tags",
-              "delete_snapshots_by_age" => "Delete Snapshots by Age"
+              "delete_snapshots_by_age" => "Delete Snapshots by Age",
+              "run_ansible_playbook"    => "Run Ansible Playbook"
              )
   end
 
@@ -219,6 +220,15 @@ class MiqAction < ApplicationRecord
                     :target_id    => rec.id,
                     :target_class => rec.class.base_class.name,
                     :message      => "Policy #{msg}: policy: [#{inputs[:policy].description}], event: [#{inputs[:event].description}]")
+  end
+
+  def action_run_ansible_playbook(action, rec, inputs)
+    service_template = ServiceTemplate.find(action.options[:service_template_id])
+    dialog_options = { :hosts => target_hosts(action, rec) }
+    request_options = { :manageiq_extra_vars => { 'event_target' => rec.href_slug,
+                                                  'event_name'   => inputs[:event].try(:name) },
+                        :initiator           => 'control' }
+    service_template.provision_request(target_user(rec), dialog_options, request_options)
   end
 
   def action_snmp_trap(action, rec, inputs)
@@ -433,51 +443,52 @@ class MiqAction < ApplicationRecord
   def run_script(rec)
     filename = self.options[:filename]
     raise _("unable to execute script, no file name specified") if filename.nil?
+
     unless File.exist?(filename)
       raise _("unable to execute script, file name [%{file_name} does not exist]") % {:file_name => filename}
     end
 
-    fd    = Tempfile.new("miq_action", SCRIPT_DIR)
-    fname = fd.path
-    fd.puts((File.extname(filename) == ".rb") ? RB_PREAMBLE : SH_PREAMBLE)
-    fd.puts(File.read(filename))
-    fd.close
+    command_result = nil
+    ruby_file = File.extname(filename) == '.rb'
 
-    File.chmod(0755, fname)
+    Tempfile.open('miq_action', SCRIPT_DIR) do |fd|
+      fd.puts ruby_file ? RB_PREAMBLE : SH_PREAMBLE
+      fd.puts File.read(filename)
+      fd.chmod(0755)
 
-    MiqPolicy.logger.info("MIQ(action_script): Executing: [#{filename}]")
-    if File.extname(filename) == ".rb"
-      runner_cmd = MiqEnvironment::Command.runner_command
-      MiqPolicy.logger.info("MIQ(action_script): Running: [#{runner_cmd} #{fname} '#{rec.name}'}]")
-      command_result = AwesomeSpawn.run(runner_cmd, :params => [fname, rec.name])
-    else
-      MiqPolicy.logger.info("MIQ(action_script): Running: [#{fname}]")
-      command_result = AwesomeSpawn.run(fname)
+      MiqPolicy.logger.info("MIQ(action_script): Executing: [#{filename}]")
+
+      if ruby_file
+        runner_cmd = MiqEnvironment::Command.runner_command
+        MiqPolicy.logger.info("MIQ(action_script): Running: [#{runner_cmd} #{fd.path} '#{rec.name}'}]")
+        command_result = AwesomeSpawn.run(runner_cmd, :params => [fd.path, rec.name])
+      else
+        MiqPolicy.logger.info("MIQ(action_script): Running: [#{fd.path}]")
+        command_result = AwesomeSpawn.run(fname)
+      end
     end
+
     rc = command_result.exit_status
     rc_verbose = RC_HASH[rc] || "Unknown RC: [#{rc}]"
 
-    fd.delete
-
     MiqPolicy.logger.info("MIQ(action_script): Result:\n#{result}")
 
+    info_msg = "MIQ(action_script): Result: #{command_result.output}, rc: #{rc_verbose}"
+
+    fail_msg = _("Action script exited with rc=%{rc_value}, error=%{error_text}") %
+      {:rc_value => rc_verbose, :error_text => command_result.error}
+
     case rc
-    when 0
-      MiqPolicy.logger.info("MIQ(action_script): Result: #{command_result.output}, rc: #{rc_verbose}")
-    when 4
-      MiqPolicy.logger.warn("MIQ(action_script): Result: #{command_result.output}, rc: #{rc_verbose}")
-    when 8
-      raise MiqException::StopAction,
-            _("Action script exited with rc=%{rc_value}, error=%{error_text}") % {:rc_value   => rc_verbose,
-                                                                                  :error_text => command_result.error}
-    when 16
-      raise MiqException::AbortAction,
-            _("Action script exited with rc=%{rc_value}, error=%{error_text}") % {:rc_value   => rc_verbose,
-                                                                                  :error_text => command_result.error}
+    when 0  # Success
+      MiqPolicy.logger.info(info_msg)
+    when 4  # Interrupted
+      MiqPolicy.logger.warn(info_msg)
+    when 8  # Exec format error
+      raise MiqException::StopAction, fail_msg
+    when 16 # Resource busy
+      raise MiqException::AbortAction, fail_msg
     else
-      raise MiqException::UnknownActionRc,
-            _("Action script exited with rc=%{rc_value}, error=%{error_text}") % {:rc_value   => rc_verbose,
-                                                                                  :error_text => command_result.error}
+      raise MiqException::UnknownActionRc, fail_msg
     end
   end
 
@@ -614,7 +625,7 @@ class MiqAction < ApplicationRecord
     end
 
     task_id = "action_#{action.id}_vm_#{rec.id}"
-    snaps_to_delete.sort { |a, b| b.create_time <=> a.create_time }.each do |s| # Delete newest to oldest
+    snaps_to_delete.sort_by(&:create_time).reverse.each do |s| # Delete newest to oldest
       MiqPolicy.logger.info("#{log_prefix} Deleting Snapshot: Name: [#{s.name}] Id: [#{s.id}] Create Time: [#{s.create_time}]")
       rec.remove_snapshot_queue(s.id, task_id)
     end
@@ -798,7 +809,7 @@ class MiqAction < ApplicationRecord
     end
 
     MiqPolicy.logger.info("MIQ(action_cancel_task): Now executing Cancel of task [#{source_event.event_type}] on VM [#{source_event.vm_name}]")
-    ems = ExtManagementSystem.find_by_id(source_event.ems_id)
+    ems = ExtManagementSystem.find_by(:id => source_event.ems_id)
     raise _("unable to find vCenter with id [%{id}]") % {:id => source_event.ems_id} if ems.nil?
 
     vim = ems.connect
@@ -1016,5 +1027,27 @@ class MiqAction < ApplicationRecord
       args[:instance_id] = target.id unless static
       MiqQueue.put(args)
     end
+  end
+
+  def target_hosts(action, rec)
+    if action.options[:use_event_target]
+      ipaddress(rec)
+    elsif action.options[:use_localhost]
+      'localhost'
+    else
+      action.options[:hosts]
+    end
+  end
+
+  def ipaddress(record)
+    record.ipaddresses[0] if record.respond_to?(:ipaddresses)
+  end
+
+  def target_user(record)
+    record.respond_to?(:tenant_identity) ? record.tenant_identity : default_user
+  end
+
+  def default_user
+    User.super_admin.tap { |u| u.current_group = Tenant.root_tenant.default_miq_group }
   end
 end

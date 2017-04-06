@@ -2,28 +2,32 @@ require "linux_admin"
 require "awesome_spawn"
 
 describe EmbeddedAnsible do
-  before do
-    ENV["APPLIANCE_ANSIBLE_DIRECTORY"] = nil
-  end
-
   context ".available?" do
-    it "returns true when installed in the default location" do
-      allow(Dir).to receive(:exist?).with("/opt/ansible-installer").and_return(true)
+    context "in an appliance" do
+      before do
+        allow(MiqEnvironment::Command).to receive(:is_appliance?).and_return(true)
+      end
 
-      expect(described_class.available?).to be_truthy
+      it "returns true when installed in the default location" do
+        installed_rpms = {
+          "ansible-tower-server" => "1.0.1",
+          "ansible-tower-setup"  => "1.2.3",
+          "vim"                  => "13.5.1"
+        }
+        expect(LinuxAdmin::Rpm).to receive(:list_installed).and_return(installed_rpms)
+
+        expect(described_class.available?).to be_truthy
+      end
+
+      it "returns false when not installed" do
+        expect(LinuxAdmin::Rpm).to receive(:list_installed).and_return("vim" => "13.5.1")
+
+        expect(described_class.available?).to be_falsey
+      end
     end
 
-    it "returns true when installed in the custom location in env var" do
-      ENV["APPLIANCE_ANSIBLE_DIRECTORY"] = "/tmp"
-      allow(Dir).to receive(:exist?).with("/tmp").and_return(true)
-      allow(Dir).to receive(:exist?).with("/opt/ansible-installer").and_return(false)
-
-      expect(described_class.available?).to be_truthy
-    end
-
-    it "returns false when not installed" do
-      allow(Dir).to receive(:exist?).with("/opt/ansible-installer").and_return(false)
-
+    it "returns false outside of an appliance" do
+      allow(MiqEnvironment::Command).to receive(:is_appliance?).and_return(false)
       expect(described_class.available?).to be_falsey
     end
   end
@@ -88,9 +92,10 @@ describe EmbeddedAnsible do
     let(:miq_database) { MiqDatabase.first }
     let(:extra_vars) do
       {
-        :minimum_var_space => 0,
-        :nginx_http_port   => described_class::NGINX_HTTP_PORT,
-        :nginx_https_port  => described_class::NGINX_HTTPS_PORT
+        :minimum_var_space  => 0,
+        :http_port          => described_class::HTTP_PORT,
+        :https_port         => described_class::HTTPS_PORT,
+        :tower_package_name => "ansible-tower-server"
       }.to_json
     end
 
@@ -98,6 +103,70 @@ describe EmbeddedAnsible do
       FactoryGirl.create(:miq_region, :region => ApplicationRecord.my_region_number)
       MiqDatabase.seed
       EvmSpecHelper.create_guid_miq_server_zone
+    end
+
+    describe ".alive?" do
+      it "returns false if the service is not configured" do
+        expect(described_class).to receive(:configured?).and_return false
+        expect(described_class.alive?).to be false
+      end
+
+      it "returns false if the service is not running" do
+        expect(described_class).to receive(:configured?).and_return true
+        expect(described_class).to receive(:running?).and_return false
+        expect(described_class.alive?).to be false
+      end
+
+      context "when a connection is attempted" do
+        let(:api_conn) { double("AnsibleAPIConnection") }
+        let(:api) { double("AnsibleAPIResource") }
+
+        before do
+          expect(described_class).to receive(:configured?).and_return true
+          expect(described_class).to receive(:running?).and_return true
+
+          miq_database.set_ansible_admin_authentication(:password => "adminpassword")
+
+          expect(AnsibleTowerClient::Connection).to receive(:new).with(
+            :base_url => "http://localhost:54321/api/v1",
+            :username => "admin",
+            :password => "adminpassword"
+          ).and_return(api_conn)
+          expect(api_conn).to receive(:api).and_return(api)
+        end
+
+        it "returns false when a AnsibleTowerClient::ConnectionError is raised" do
+          error = AnsibleTowerClient::ConnectionError.new("error")
+          expect(api).to receive(:verify_credentials).and_raise(error)
+          expect(described_class.alive?).to be false
+        end
+
+        it "returns false when a AnsibleTowerClient::SSLError is raised" do
+          error = AnsibleTowerClient::SSLError.new("error")
+          expect(api).to receive(:verify_credentials).and_raise(error)
+          expect(described_class.alive?).to be false
+        end
+
+        it "returns false when an AnsibleTowerClient::ConnectionError is raised" do
+          expect(api).to receive(:verify_credentials).and_raise(AnsibleTowerClient::ConnectionError)
+          expect(described_class.alive?).to be false
+        end
+
+        it "returns false when an AnsibleTowerClient::ClientError is raised" do
+          expect(api).to receive(:verify_credentials).and_raise(AnsibleTowerClient::ClientError)
+          expect(described_class.alive?).to be false
+        end
+
+        it "raises when other errors are raised" do
+          expect(api).to receive(:verify_credentials).and_raise(RuntimeError)
+          expect { described_class.alive? }.to raise_error(RuntimeError)
+        end
+
+        it "returns true when no error is raised" do
+          expect(api).to receive(:verify_credentials)
+          expect(described_class.alive?).to be true
+        end
+      end
     end
 
     context "with a key file" do
@@ -162,21 +231,23 @@ describe EmbeddedAnsible do
       end
 
       it "generates new passwords with no passwords set" do
-        expect(described_class).to receive(:generate_database_password).and_return("databasepassword")
+        expect(described_class).to receive(:generate_database_authentication).and_return(double(:userid => "awx", :password => "databasepassword"))
         expect(AwesomeSpawn).to receive(:run!) do |script_path, options|
           params                  = options[:params]
-          inventory_file_contents = File.read(params[:i])
+          inventory_file_contents = File.read(params[:inventory=])
 
-          expect(script_path).to eq("/opt/ansible-installer/setup.sh")
-          expect(params[:e]).to eq(extra_vars)
-          expect(params[:k]).to eq("packages,migrations,firewall,supervisor")
+          expect(script_path).to eq("ansible-tower-setup")
+          expect(params["--"]).to be_nil
+          expect(params[:extra_vars=]).to eq(extra_vars)
+          expect(params[:skip_tags=]).to eq("packages,migrations,firewall,supervisor")
 
-          new_admin_password  = miq_database.ansible_admin_password
-          new_rabbit_password = miq_database.ansible_rabbitmq_password
-          expect(new_admin_password).not_to be_nil
-          expect(new_rabbit_password).not_to be_nil
-          expect(inventory_file_contents).to include("admin_password='#{new_admin_password}'")
-          expect(inventory_file_contents).to include("rabbitmq_password='#{new_rabbit_password}'")
+          new_admin_auth  = miq_database.ansible_admin_authentication
+          new_rabbit_auth = miq_database.ansible_rabbitmq_authentication
+          expect(new_admin_auth.userid).to eq("admin")
+          expect(inventory_file_contents).to include("admin_password='#{new_admin_auth.password}'")
+          expect(inventory_file_contents).to include("rabbitmq_username='#{new_rabbit_auth.userid}'")
+          expect(inventory_file_contents).to include("rabbitmq_password='#{new_rabbit_auth.password}'")
+          expect(inventory_file_contents).to include("pg_username='awx'")
           expect(inventory_file_contents).to include("pg_password='databasepassword'")
         end
 
@@ -184,20 +255,23 @@ describe EmbeddedAnsible do
       end
 
       it "uses the existing passwords when they are set in the database" do
-        miq_database.ansible_admin_password    = "adminpassword"
-        miq_database.ansible_rabbitmq_password = "rabbitpassword"
-        miq_database.ansible_database_password = "databasepassword"
+        miq_database.set_ansible_admin_authentication(:password => "adminpassword")
+        miq_database.set_ansible_rabbitmq_authentication(:userid => "rabbituser", :password => "rabbitpassword")
+        miq_database.set_ansible_database_authentication(:userid => "databaseuser", :password => "databasepassword")
 
         expect(AwesomeSpawn).to receive(:run!) do |script_path, options|
           params                  = options[:params]
-          inventory_file_contents = File.read(params[:i])
+          inventory_file_contents = File.read(params[:inventory=])
 
-          expect(script_path).to eq("/opt/ansible-installer/setup.sh")
-          expect(params[:e]).to eq(extra_vars)
-          expect(params[:k]).to eq("packages,migrations,firewall,supervisor")
+          expect(script_path).to eq("ansible-tower-setup")
+          expect(params["--"]).to be_nil
+          expect(params[:extra_vars=]).to eq(extra_vars)
+          expect(params[:skip_tags=]).to eq("packages,migrations,firewall,supervisor")
 
           expect(inventory_file_contents).to include("admin_password='adminpassword'")
+          expect(inventory_file_contents).to include("rabbitmq_username='rabbituser'")
           expect(inventory_file_contents).to include("rabbitmq_password='rabbitpassword'")
+          expect(inventory_file_contents).to include("pg_username='databaseuser'")
           expect(inventory_file_contents).to include("pg_password='databasepassword'")
         end
 
@@ -206,25 +280,73 @@ describe EmbeddedAnsible do
     end
 
     describe ".start" do
-      it "runs the setup script with the correct args" do
-        miq_database.ansible_admin_password    = "adminpassword"
-        miq_database.ansible_rabbitmq_password = "rabbitpassword"
-        miq_database.ansible_database_password = "databasepassword"
+      before do
+        miq_database.set_ansible_admin_authentication(:password => "adminpassword")
+        miq_database.set_ansible_rabbitmq_authentication(:userid => "rabbituser", :password => "rabbitpassword")
+        miq_database.set_ansible_database_authentication(:userid => "databaseuser", :password => "databasepassword")
 
+        expect(described_class).to receive(:configure_secret_key)
+        stub_const("EmbeddedAnsible::WAIT_FOR_ANSIBLE_SLEEP", 0)
+      end
+
+      it "runs the setup script with the correct args" do
         expect(AwesomeSpawn).to receive(:run!) do |script_path, options|
           params                  = options[:params]
-          inventory_file_contents = File.read(params[:i])
+          inventory_file_contents = File.read(params[:inventory=])
 
-          expect(script_path).to eq("/opt/ansible-installer/setup.sh")
-          expect(params[:e]).to eq(extra_vars)
-          expect(params[:k]).to eq("packages,migrations,firewall")
+          expect(script_path).to eq("ansible-tower-setup")
+          expect(params["--"]).to be_nil
+          expect(params[:extra_vars=]).to eq(extra_vars)
+          expect(params[:skip_tags=]).to eq("packages,migrations,firewall")
 
           expect(inventory_file_contents).to include("admin_password='adminpassword'")
+          expect(inventory_file_contents).to include("rabbitmq_username='rabbituser'")
           expect(inventory_file_contents).to include("rabbitmq_password='rabbitpassword'")
+          expect(inventory_file_contents).to include("pg_username='databaseuser'")
           expect(inventory_file_contents).to include("pg_password='databasepassword'")
         end
+        expect(described_class).to receive(:alive?).and_return(true)
 
         described_class.start
+      end
+
+      it "waits for Ansible to respond" do
+        expect(AwesomeSpawn).to receive(:run!)
+
+        expect(described_class).to receive(:alive?).exactly(3).times.and_return(false, false, true)
+
+        described_class.start
+      end
+
+      it "raises if Ansible doesn't respond" do
+        expect(AwesomeSpawn).to receive(:run!)
+
+        expect(described_class).to receive(:alive?).exactly(5).times.and_return(false)
+
+        expect { described_class.start }.to raise_error(RuntimeError)
+      end
+    end
+
+    describe ".generate_database_authentication (private)" do
+      let(:password)        { "secretpassword" }
+      let(:quoted_password) { ActiveRecord::Base.connection.quote(password) }
+      let(:connection)      { double(:quote => quoted_password) }
+
+      before do
+        allow(connection).to receive(:quote_column_name) do |name|
+          ActiveRecord::Base.connection.quote_column_name(name)
+        end
+      end
+
+      it "creates the database" do
+        allow(described_class).to receive(:database_connection).and_return(connection)
+        expect(described_class).to receive(:generate_password).and_return(password)
+        expect(connection).to receive(:select_value).with("CREATE ROLE \"awx\" WITH LOGIN PASSWORD #{quoted_password}")
+        expect(connection).to receive(:select_value).with("CREATE DATABASE awx OWNER \"awx\" ENCODING 'utf8'")
+
+        auth = described_class.send(:generate_database_authentication)
+        expect(auth.userid).to eq("awx")
+        expect(auth.password).to eq(password)
       end
     end
   end

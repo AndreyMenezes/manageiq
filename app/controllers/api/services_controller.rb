@@ -3,6 +3,7 @@ module Api
     include Subcollections::ServiceDialogs
     include Subcollections::Tags
     include Subcollections::Vms
+    include Subcollections::OrchestrationStacks
 
     def create_resource(_type, _id, data)
       validate_service_data(data)
@@ -10,6 +11,45 @@ module Api
       service    = collection_class(:services).create(attributes)
       validate_service(service)
       service
+    end
+
+    def edit_resource(type, id, data)
+      attributes = build_service_attributes(data)
+      super(type, id, attributes)
+    end
+
+    def add_resource_resource(type, id, data)
+      raise "Must specify a service href or id to add_resource to" unless id
+      svc = resource_search(id, type, collection_class(type))
+
+      resource_type, resource = validate_resource(data)
+      raise "Cannot assign #{resource_type} to #{service_ident(svc)}" unless resource.respond_to? :add_to_service
+
+      resource.add_to_service(svc)
+      action_result(true, "Assigned resource #{resource_type} id:#{resource.id} to #{service_ident(svc)}")
+    rescue => err
+      action_result(false, err.to_s)
+    end
+
+    def remove_resource_resource(type, id, data)
+      raise 'Must specify a resource to remove_resource from' unless id
+      svc = resource_search(id, type, collection_class(type))
+
+      resource_type, resource = validate_resource(data)
+
+      svc.remove_resource(resource)
+      action_result(true, "Unassigned resource #{resource_type} id:#{resource.id} from #{service_ident(svc)}")
+    rescue => err
+      action_result(false, err.to_s)
+    end
+
+    def remove_all_resources_resource(type, id, _data)
+      raise "Must specify a service href or id to remove resources from" unless id
+      svc = resource_search(id, type, collection_class(type))
+      svc.remove_all_resources
+      action_result(true, "Removed all resources from #{service_ident(svc)}")
+    rescue => err
+      action_result(false, err.to_s)
     end
 
     def reconfigure_resource(type, id = nil, data = nil)
@@ -78,6 +118,17 @@ module Api
 
     private
 
+    def validate_resource(data)
+      resource_href = data.fetch_path("resource", "href")
+      raise "Must specify a resource reference" unless resource_href
+
+      resource_type, resource_id = parse_href(resource_href)
+      raise "Invalid resource href specified #{resource_href}" unless resource_type && resource_id
+
+      resource = resource_search(resource_id, resource_type, collection_class(resource_type))
+      [resource_type, resource]
+    end
+
     def build_service_attributes(data)
       attributes                 = data.dup
       attributes['job_template'] = fetch_configuration_script(data['job_template']) if data['job_template']
@@ -109,19 +160,19 @@ module Api
     end
 
     def fetch_ext_management_system(data)
-      orchestration_manager_id = parse_id(data, :orchestration_manager)
+      orchestration_manager_id = parse_id(data, :providers)
       raise BadRequestError, 'Missing ExtManagementSystem identifier id' if orchestration_manager_id.nil?
       resource_search(orchestration_manager_id, :ext_management_systems, ExtManagementSystem)
     end
 
     def fetch_service(data)
-      service_id = parse_id(data, :service)
+      service_id = parse_id(data, :services)
       raise BadRequestError, 'Missing Service identifier id' if service_id.nil?
       resource_search(service_id, :services, Service)
     end
 
     def fetch_orchestration_template(data)
-      orchestration_template_id = parse_id(data, :orchestration_template)
+      orchestration_template_id = parse_id(data, :orchestration_templates)
       raise BadRequestError, 'Missing OrchestrationTemplate identifier id' if orchestration_template_id.nil?
       resource_search(orchestration_template_id, :orchestration_templates, OrchestrationTemplate)
     end

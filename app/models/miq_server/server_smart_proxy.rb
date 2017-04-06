@@ -3,6 +3,8 @@ require 'yaml'
 module MiqServer::ServerSmartProxy
   extend ActiveSupport::Concern
 
+  SMART_ROLES = %w(smartproxy smartstate).freeze
+
   included do
     serialize :capabilities
   end
@@ -150,10 +152,6 @@ module MiqServer::ServerSmartProxy
 
     # Print the stack trace to debug logging level
     errArray.each { |e| $log.error "Error Trace: [#{e}]" }
-  end
-
-  def miq_proxy
-    self
   end
 
   def forceVmScan

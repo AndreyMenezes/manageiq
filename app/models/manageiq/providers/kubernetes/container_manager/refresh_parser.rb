@@ -3,8 +3,8 @@ require 'shellwords'
 module ManageIQ::Providers::Kubernetes
   class ContainerManager::RefreshParser
     include Vmdb::Logging
-    def self.ems_inv_to_hashes(inventory)
-      new.ems_inv_to_hashes(inventory)
+    def self.ems_inv_to_hashes(inventory, options = Config::Options.new)
+      new.ems_inv_to_hashes(inventory, options)
     end
 
     def initialize
@@ -13,7 +13,7 @@ module ManageIQ::Providers::Kubernetes
       @label_tag_mapping = ContainerLabelTagMapping.cache
     end
 
-    def ems_inv_to_hashes(inventory)
+    def ems_inv_to_hashes(inventory, _options = Config::Options.new)
       get_additional_attributes(inventory)
       get_nodes(inventory)
       get_namespaces(inventory)
@@ -26,20 +26,8 @@ module ManageIQ::Providers::Kubernetes
       get_endpoints(inventory)
       get_services(inventory)
       get_component_statuses(inventory)
-      get_registries
-      get_images
       EmsRefresh.log_inv_debug_trace(@data, "data:")
       @data
-    end
-
-    def get_images
-      images = @data_index.fetch_path(:container_image, :by_ref_and_registry_host_port).try(:values) || []
-      process_collection(images, :container_images) { |n| n }
-    end
-
-    def get_registries
-      registries = @data_index.fetch_path(:container_image_registry, :by_host_and_port).try(:values) || []
-      process_collection(registries, :container_image_registries) { |n| n }
     end
 
     def get_nodes(inventory)
@@ -407,7 +395,6 @@ module ManageIQ::Providers::Kubernetes
       new_result.merge!(parse_volume_source(persistent_volume.spec))
       new_result.merge!(
         :type                    => 'PersistentVolume',
-        :parent_type             => 'ManageIQ::Providers::ContainerManager',
         :capacity                => parse_resource_list(persistent_volume.spec.capacity.to_h),
         :access_modes            => persistent_volume.spec.accessModes.join(','),
         :reclaim_policy          => persistent_volume.spec.persistentVolumeReclaimPolicy,
@@ -692,17 +679,22 @@ module ManageIQ::Providers::Kubernetes
         if stored_container_image_registry.nil?
           @data_index.store_path(
             :container_image_registry, :by_host_and_port, host_port, container_image_registry)
+          process_collection_item(container_image_registry, :container_image_registries) { |r| r }
           stored_container_image_registry = container_image_registry
         end
       end
 
+      # old docker references won't yield a digest and will always be distinct
+      container_image_identity = container_image[:digest] || container_image[:image_ref]
       stored_container_image = @data_index.fetch_path(
-        :container_image, :by_ref_and_registry_host_port,  "#{host_port}:#{container_image[:image_ref]}")
+        :container_image, :by_digest, container_image_identity)
 
       if stored_container_image.nil?
         @data_index.store_path(
-          :container_image, :by_ref_and_registry_host_port,
-          "#{host_port}:#{container_image[:image_ref]}", container_image)
+          :container_image, :by_digest,
+          container_image_identity, container_image
+        )
+        process_collection_item(container_image, :container_images) { |img| img }
         stored_container_image = container_image
       end
 
@@ -773,6 +765,15 @@ module ManageIQ::Providers::Kubernetes
       image_ref_parts = image_definition_re.match(image_ref)
 
       hostname = image_parts[:host] || image_parts[:host2] || image_parts[:localhost]
+      if image_ref.start_with?(ContainerImage::DOCKER_IMAGE_PREFIX) && image_parts[:digest]
+        image_ref = "%{prefix}%{registry}%{name}@%{digest}" % {
+          :prefix   => ContainerImage::DOCKER_PULLABLE_PREFIX,
+          :registry => ("#{hostname}:#{image_parts[:port]}/" if hostname && image_parts[:port]),
+          :name     => image_parts[:name],
+          :digest   => image_parts[:digest],
+        }
+      end
+
       [
         {
           :name          => image_parts[:name],
@@ -804,7 +805,6 @@ module ManageIQ::Providers::Kubernetes
         {
           :type                    => 'ContainerVolume',
           :name                    => volume.name,
-          :parent_type             => 'ContainerGroup',
           :persistent_volume_claim => @data_index.fetch_path(:persistent_volume_claims,
                                                              :by_namespace_and_name,
                                                              pod.metadata.namespace,

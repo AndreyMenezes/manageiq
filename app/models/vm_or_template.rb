@@ -128,6 +128,7 @@ class VmOrTemplate < ApplicationRecord
   has_many                  :direct_services, :through => :service_resources, :source => :service
   belongs_to                :tenant
   has_many                  :connected_shares, -> { where(:resource_type => "VmOrTemplate") }, :foreign_key => :resource_id, :class_name => "Share"
+  has_many                  :labels, -> { where(:section => "labels") }, :class_name => "CustomAttribute", :as => :resource, :dependent => :destroy
 
   acts_as_miq_taggable
 
@@ -144,7 +145,6 @@ class VmOrTemplate < ApplicationRecord
   virtual_column :v_owning_blue_folder_path,            :type => :string,     :uses => :all_relationships
   virtual_column :v_datastore_path,                     :type => :string,     :uses => :storage
   virtual_column :thin_provisioned,                     :type => :boolean,    :uses => {:hardware => :disks}
-  virtual_column :provisioned_storage,                  :type => :integer,    :uses => [:allocated_disk_storage, :mem_cpu]
   virtual_column :used_storage,                         :type => :integer,    :uses => [:used_disk_storage, :mem_cpu]
   virtual_column :used_storage_by_state,                :type => :integer,    :uses => :used_storage
   virtual_column :uncommitted_storage,                  :type => :integer,    :uses => [:provisioned_storage, :used_storage_by_state]
@@ -166,6 +166,8 @@ class VmOrTemplate < ApplicationRecord
   virtual_has_many   :processes,              :class_name => "OsProcess",    :uses => {:operating_system => :processes}
   virtual_has_many   :event_logs,                                            :uses => {:operating_system => :event_logs}
   virtual_has_many   :lans,                                                  :uses => {:hardware => {:nics => :lan}}
+  virtual_has_many   :child_resources,        :class_name => "VmOrTemplate"
+
   virtual_belongs_to :miq_provision_template, :class_name => "Vm",           :uses => {:miq_provision => :vm_template}
   virtual_belongs_to :parent_resource_pool,   :class_name => "ResourcePool", :uses => :all_relationships
 
@@ -177,6 +179,7 @@ class VmOrTemplate < ApplicationRecord
 
   virtual_has_one   :direct_service,       :class_name => 'Service'
   virtual_has_one   :service,              :class_name => 'Service'
+  virtual_has_one   :parent_resource,      :class_name => "VmOrTemplate"
 
   virtual_delegate :name, :to => :host, :prefix => true, :allow_nil => true
   virtual_delegate :name, :to => :storage, :prefix => true, :allow_nil => true
@@ -335,24 +338,7 @@ class VmOrTemplate < ApplicationRecord
   # cb_method:    the MiqQueue callback method along with the parameters that is called
   #               when automate process is done and the event is not prevented to proceed by policy
   def check_policy_prevent(policy_event, *cb_method)
-    cb = {
-      :class_name  => self.class.to_s,
-      :instance_id => id,
-      :method_name => :check_policy_prevent_callback,
-      :args        => [*cb_method],
-      :server_guid => MiqServer.my_guid
-    }
-    enforce_policy(policy_event, {}, :miq_callback => cb) unless policy_event.nil?
-  end
-
-  def check_policy_prevent_callback(*action, _status, _message, result)
-    prevented = false
-    if result.kind_of?(MiqAeEngine::MiqAeWorkspaceRuntime)
-      event = result.get_obj_from_path("/")['event_stream']
-      data  = event.attributes["full_data"]
-      prevented = data.fetch_path(:policy, :prevented) if data
-    end
-    prevented ? _log.info(event.attributes["message"].to_s) : send(*action)
+    enforce_policy(policy_event, {}, {:miq_callback => prevent_callback_settings(*cb_method)}) unless policy_event.nil?
   end
 
   def enforce_policy(event, inputs = {}, options = {})
@@ -426,7 +412,7 @@ class VmOrTemplate < ApplicationRecord
     if queue_item.last_exception.kind_of?(MiqException::MiqVimBrokerUnavailable)
       queue_item.requeue(:deliver_on => 1.minute.from_now.utc)
     else
-      task = MiqTask.find_by_id(task_id)
+      task = MiqTask.find_by(:id => task_id)
       task.queue_callback("Finished", status, msg, result) if task
     end
   end
@@ -494,7 +480,7 @@ class VmOrTemplate < ApplicationRecord
 
   def save_genealogy_information
     if defined?(@genealogy_parent_object) && @genealogy_parent_object
-      @genealogy_parent_object.with_relationship_type('genealogy') { @genealogy_parent_object.set_child(self) }
+      with_relationship_type('genealogy') { self.parent = @genealogy_parent_object }
     end
   end
 
@@ -875,7 +861,7 @@ class VmOrTemplate < ApplicationRecord
     defaultsmartproxy = ::Settings.repository_scanning.defaultsmartproxy
 
     proxy = nil
-    proxy = MiqProxy.find_by_id(defaultsmartproxy.to_i) if defaultsmartproxy
+    proxy = MiqProxy.find_by(:id => defaultsmartproxy.to_i) if defaultsmartproxy
     proxy.try(:host)
   end
 
@@ -939,7 +925,7 @@ class VmOrTemplate < ApplicationRecord
   def log_proxies(proxy_list = [], all_proxy_list = nil, message = nil, job = nil)
     log_method = proxy_list.empty? ? :warn : :debug
     all_proxy_list ||= storage2proxies
-    proxies = all_proxy_list.collect { |a| "[#{log_proxies_format_instance(a.miq_proxy)}]" }
+    proxies = all_proxy_list.collect { |a| "[#{log_proxies_format_instance(a)}]" }
     job_guid = job.nil? ? "" : job.guid
     proxies_text = proxies.empty? ? "[none]" : proxies.join(" -- ")
     method_name = caller[0][/`([^']*)'/, 1]
@@ -1005,14 +991,6 @@ class VmOrTemplate < ApplicationRecord
 
   def has_proxy?
     storage2proxies.any?
-  end
-
-  def miq_proxies
-    miqproxies = storage2proxies.collect(&:miq_proxy).compact
-
-    # The UI does not handle getting back non-MiqProxy objects back from this call.
-    # Remove MiqServer elements until we can support different class types.
-    miqproxies.delete_if { |p| p.class == MiqServer }
   end
 
   # Cache the servers because the JobProxyDispatch calls this for each Vm scan job in a loop
@@ -1137,7 +1115,7 @@ class VmOrTemplate < ApplicationRecord
     # Create queue items to do additional process like apply tags and link events
     unless added_vms.empty?
       added_vm_ids = []
-      added_vms.each do |v|
+      added_vms.find_each do |v|
         v.post_create_actions_queue
         added_vm_ids << v.id
       end
@@ -1540,9 +1518,7 @@ class VmOrTemplate < ApplicationRecord
   virtual_delegate :allocated_disk_storage, :used_disk_storage,
                    :to => :hardware, :allow_nil => true, :uses => {:hardware => :disks}
 
-  def provisioned_storage
-    allocated_disk_storage.to_i + ram_size_in_bytes
-  end
+  virtual_delegate :provisioned_storage, :to => :hardware, :allow_nil => true, :default => 0
 
   def used_storage
     used_disk_storage.to_i + ram_size_in_bytes
@@ -1673,11 +1649,6 @@ class VmOrTemplate < ApplicationRecord
     direct_service.try(:root_service)
   end
 
-  def raise_is_available_now_error_message(request_type)
-    msg = send("validate_#{request_type}")[:message]
-    raise MiqException::MiqVmError, msg unless msg.nil?
-  end
-
   def has_required_host?
     !host.nil?
   end
@@ -1801,9 +1772,7 @@ class VmOrTemplate < ApplicationRecord
     MiqTemplate.where(:id => ids).exists?
   end
 
-  def supports_snapshots?
-    false
-  end
+  supports_not :snapshots
 
   def self.batch_operation_supported?(operation, ids)
     VmOrTemplate.where(:id => ids).all? do |vm_or_template|
@@ -1835,10 +1804,28 @@ class VmOrTemplate < ApplicationRecord
      template_tenant_ids, vm_tenant_ids]
   end
 
+  def self.with_ownership
+    includes(:ext_management_system).where(:ext_management_systems => {:tenant_mapping_enabled => [false, nil]})
+  end
+
   def tenant_identity
     user = evm_owner
     user = User.super_admin.tap { |u| u.current_group = miq_group } if user.nil? || !user.miq_group_ids.include?(miq_group_id)
     user
+  end
+
+  supports :console do
+    unless console_supported?('spice') || console_supported?('vnc')
+      unsupported_reason_add(:console, N_("Console not supported"))
+    end
+  end
+
+  def child_resources
+    children
+  end
+
+  def parent_resource
+    parent
   end
 
   private

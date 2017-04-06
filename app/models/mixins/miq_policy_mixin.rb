@@ -28,7 +28,7 @@ module MiqPolicyMixin
     tag_list(:ns => ns, :cat => cat).split.collect do|t|
       klass, id = t.split("/")
       next unless ["miq_policy", "miq_policy_set"].include?(klass)
-      policy = klass.camelize.constantize.find_by_id(id.to_i)
+      policy = klass.camelize.constantize.find_by(:id => id.to_i)
       mode.nil? || policy.mode == mode ? policy : nil
     end.compact
   end
@@ -91,6 +91,28 @@ module MiqPolicyMixin
 
   def parent_enterprise
     MiqEnterprise.my_enterprise
+  end
+
+  # cb_method: the MiqQueue callback method along with the parameters that is called
+  #            when automate process is done and the request is not prevented to proceed by policy
+  def prevent_callback_settings(*cb_method)
+    {
+      :class_name  => self.class.to_s,
+      :instance_id => id,
+      :method_name => :check_policy_prevent_callback,
+      :args        => [*cb_method],
+      :server_guid => MiqServer.my_guid
+    }
+  end
+
+  def check_policy_prevent_callback(*action, _status, _message, result)
+    prevented = false
+    if result.kind_of?(MiqAeEngine::MiqAeWorkspaceRuntime)
+      event = result.get_obj_from_path("/")['event_stream']
+      data  = event.attributes["full_data"]
+      prevented = data.fetch_path(:policy, :prevented) if data
+    end
+    prevented ? _log.info(event.attributes["message"]) : send(*action)
   end
 
   module ClassMethods

@@ -119,35 +119,9 @@ class MiqReport < ApplicationRecord
     {
       :data_type         => data_type,
       :available_formats => get_available_formats(path, data_type),
-      :default_format    => get_default_format(path, data_type),
+      :default_format    => Formats.default_format_for_path(path, data_type),
       :numeric           => [:integer, :decimal, :fixnum, :float].include?(data_type)
     }
-  end
-
-  def self.display_filter_details(cols, mode)
-    # mode => :field || :tag
-    # Only return cols from has_many sub-tables
-    return [] if cols.nil?
-    cols.inject([]) do |r, c|
-      # eg. c = ["Host.Hardware.Disks : File Name", "Host.hardware.disks-filename"]
-      parts = c.last.split(".")
-      parts[-1] = parts.last.split("-").first # Strip off field name from last element
-
-      if parts.last == "managed"
-        next(r) unless mode == :tag
-        parts.pop # Remove "managed" from tail andjust just evaluate relationship
-      else
-        next(r) unless mode == :field
-      end
-
-      model = parts.shift
-      relats = MiqExpression.get_relats(model)
-      # Build relats hash fetch path like: [:reflections, :hardware, :reflections, :disks, :parent, :multivalue]
-      path = parts.inject([]) { |a, p| a << :reflections; a << p.to_sym }
-      path += [:parent, :multivalue]
-      multi = relats.fetch_path(*path)
-      multi == true ? r << c : r
-    end
   end
 
   def list_schedules
@@ -175,7 +149,7 @@ class MiqReport < ApplicationRecord
 
   def contains_records?
     (extras.key?(:total_html_rows) && extras[:total_html_rows] > 0) ||
-      (table && table.data.length > 0)
+      (table && !table.data.empty?)
   end
 
   def to_hash

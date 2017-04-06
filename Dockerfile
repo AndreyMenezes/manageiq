@@ -11,6 +11,9 @@ ENV APP_ROOT /var/www/miq/vmdb
 ENV APPLIANCE_ROOT /opt/manageiq/manageiq-appliance
 ENV SUI_ROOT /opt/manageiq/manageiq-ui-service
 
+## To cleanly shutdown systemd, use SIGRTMIN+3
+STOPSIGNAL SIGRTMIN+3
+
 # Fetch and manageiq release repo
 RUN curl -sSLko /etc/yum.repos.d/manageiq-ManageIQ-Fine-epel-7.repo \
       https://copr.fedorainfracloud.org/coprs/manageiq/ManageIQ-Fine/repo/epel-7/manageiq-ManageIQ-Fine-epel-7.repo
@@ -59,6 +62,8 @@ RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
                    lvm2                    \
                    openldap-clients        \
                    gdbm-devel              \
+                   cronie                  \
+                   logrotate               \
                    &&                      \
     yum clean all
 
@@ -119,8 +124,8 @@ RUN source /etc/default/evm && \
     export RAILS_USE_MEMORY_STORE="true" && \
     npm install bower yarn -g && \
     gem install bundler --conservative && \
-    bower install --allow-root -F --silent --config.analytics=false && \
     bundle install && \
+    rake update:bower && \
     bin/rails log:clear tmp:clear && \
     rake evm:compile_assets && \
     rake evm:compile_sti_loader && \
@@ -133,7 +138,7 @@ RUN source /etc/default/evm && \
     rm -rvf ${RUBY_GEMS_ROOT}/cache/* && \
     rm -rvf /root/.bundle/cache && \
     rm -rvf ${APP_ROOT}/tmp/cache/assets && \
-    rm -rf ${APP_ROOT}/log/*
+    rm -vf ${APP_ROOT}/log/*.log
 
 ## Build SUI
 RUN source /etc/default/evm && \
@@ -149,7 +154,7 @@ COPY docker-assets/appliance-initialize.sh /bin
 RUN ln -s /var/www/miq/vmdb/docker-assets/docker_initdb /usr/bin
 
 ## Enable services on systemd
-RUN systemctl enable memcached appliance-initialize evmserverd evminit evm-watchdog miqvmstat miqtop
+RUN systemctl enable memcached appliance-initialize evmserverd evminit evm-watchdog miqvmstat miqtop crond
 
 ## Expose required container ports
 EXPOSE 80 443

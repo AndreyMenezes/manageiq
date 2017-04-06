@@ -83,6 +83,14 @@ audit_events:
 - userid
 - source
 - created_on
+authentication_configuration_script_bases:
+- id
+- authentication_id
+- configuration_script_base_id
+authentication_orchestration_stacks:
+- id
+- authentication_id
+- orchestration_stack_id
 authentications:
 - id
 - name
@@ -131,6 +139,8 @@ authentications:
 - rhsm_sku
 - rhsm_pool_id
 - rhsm_server
+- manager_ref
+- options
 availability_zones:
 - id
 - ems_id
@@ -303,6 +313,8 @@ cloud_object_store_containers:
 - bytes
 - ems_id
 - cloud_tenant_id
+- name
+- type
 cloud_object_store_objects:
 - id
 - ems_ref
@@ -314,6 +326,8 @@ cloud_object_store_objects:
 - ems_id
 - cloud_tenant_id
 - cloud_object_store_container_id
+- name
+- type
 cloud_resource_quotas:
 - id
 - ems_ref
@@ -531,6 +545,14 @@ configuration_script_sources:
 - description
 - created_at
 - updated_at
+- scm_type
+- scm_url
+- scm_branch
+- scm_clean
+- scm_delete_on_update
+- scm_update_on_launch
+- authentication_id
+- type
 configuration_scripts:
 - id
 - manager_id
@@ -1233,6 +1255,7 @@ event_streams:
 - middleware_server_name
 - middleware_deployment_id
 - middleware_deployment_name
+- generating_ems_id
 ext_management_systems:
 - id
 - name
@@ -1309,6 +1332,16 @@ firewall_rules:
 - source_ip_range
 - ems_ref
 - network_protocol
+firmwares:
+- id
+- name
+- build
+- version
+- release_date
+- resource_id
+- resource_type
+- created_at
+- updated_at
 flavors:
 - id
 - ems_id
@@ -1518,6 +1551,7 @@ hosts:
 - availability_zone_id
 - maintenance
 - maintenance_reason
+- physical_server_id
 import_file_uploads:
 - id
 iso_datastores:
@@ -1535,7 +1569,6 @@ jobs:
 - state
 - status
 - message
-- code
 - name
 - userid
 - created_on
@@ -1545,8 +1578,6 @@ jobs:
 - type
 - process
 - agent_id
-- agent_class
-- agent_state
 - agent_message
 - started_on
 - dispatch_status
@@ -1554,9 +1585,9 @@ jobs:
 - miq_server_id
 - zone
 - agent_name
-- archive
 - options
 - context
+- miq_task_id
 key_pairs_vms:
 - authentication_id
 - vm_id
@@ -4835,10 +4866,12 @@ miq_alert_statuses:
 - result
 - url
 - severity
-- ancestry
 - acknowledged
 - ems_id
 - description
+- resolved
+- event_ems_ref
+- assignee_id
 miq_alerts:
 - id
 - guid
@@ -5301,6 +5334,8 @@ miq_tasks:
 - results
 - miq_server_id
 - identifier
+- started_on
+- zone
 miq_user_roles:
 - id
 - name
@@ -6003,6 +6038,8 @@ orchestration_stack_resources:
 - last_updated
 - stack_id
 - ems_ref
+- start_time
+- finish_time
 orchestration_stacks:
 - id
 - name
@@ -6024,6 +6061,11 @@ orchestration_stacks:
 - status_reason
 - cloud_tenant_id
 - resource_group
+- start_time
+- finish_time
+- configuration_script_base_id
+- verbosity
+- hosts
 orchestration_templates:
 - id
 - name
@@ -6102,6 +6144,18 @@ physical_servers:
 - ems_ref
 - created_at
 - updated_at
+- health_state
+- power_state
+- hostname
+- product_name
+- manufacturer
+- machine_type
+- model
+- serial_number
+- field_replaceable_unit
+- raw_power_state
+- vendor
+- location_led_state
 pictures:
 - id
 - resource_id
@@ -6402,6 +6456,7 @@ services:
 - retirement_requester
 - tenant_id
 - ancestry
+- initiator
 sessions:
 - id
 - session_id

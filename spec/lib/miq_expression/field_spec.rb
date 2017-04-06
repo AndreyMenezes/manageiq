@@ -1,5 +1,3 @@
-require "rails_helper"
-
 RSpec.describe MiqExpression::Field do
   describe ".parse" do
     it "can parse the model name" do
@@ -55,6 +53,27 @@ RSpec.describe MiqExpression::Field do
     it "will return nil when given a field with unsupported syntax" do
       field = "Vm,host+name"
       expect(described_class.parse(field)).to be_nil
+    end
+
+    it "will return nil when given a tag" do
+      tag = "Vm.managed-name"
+      expect(described_class.parse(tag)).to be_nil
+
+      tag = "Vm.hosts.managed-name"
+      expect(described_class.parse(tag)).to be_nil
+
+      tag = "Vm.user_tag-name"
+      expect(described_class.parse(tag)).to be_nil
+
+      tag = "Vm.hosts.user_tag-name"
+      expect(described_class.parse(tag)).to be_nil
+    end
+
+    it 'parses field with numbers in association' do
+      field = 'Vm.win32_services-dependencies'
+      expect(described_class.parse(field)).to have_attributes(:model        => Vm,
+                                                              :associations => %w(win32_services),
+                                                              :column       => 'dependencies')
     end
   end
 
@@ -232,6 +251,7 @@ RSpec.describe MiqExpression::Field do
 
     it "does not detect a string to looks like a field but isn't" do
       expect(MiqExpression::Field.is_field?("NetworkManager-team")).to be_falsey
+      expect(described_class.is_field?("ManageIQ-name")).to be(false)
     end
   end
 end

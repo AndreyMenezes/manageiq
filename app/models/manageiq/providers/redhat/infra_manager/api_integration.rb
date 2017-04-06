@@ -1,3 +1,6 @@
+require 'openssl'
+require 'resolv'
+
 module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
   extend ActiveSupport::Concern
 
@@ -12,28 +15,48 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
   end
 
   def connect(options = {})
-    raise "no credentials defined" if self.missing_credentials?(options[:auth_type])
+    raise "no credentials defined" if missing_credentials?(options[:auth_type])
     version = options[:version] || 3
     unless options[:skip_supported_api_validation] || supports_the_api_version?(version)
       raise "version #{version} of the api is not supported by the provider"
     end
-    # If there is API path stored in the endpoints table and use it:
+
+    # If the API path is stored in the endpoints table then use it:
     path = options[:path] || default_endpoint.path
     _log.info("Using stored API path '#{path}'.") unless path.blank?
 
-    server   = options[:ip] || address
-    port     = options[:port] || self.port
-    username = options[:user] || authentication_userid(options[:auth_type])
-    password = options[:pass] || authentication_password(options[:auth_type])
-    service  = options[:service] || "Service"
+    # Prepare the options to call the method that creates the actual connection:
+    connect_options = {
+      :scheme     => options[:scheme] || 'https',
+      :server     => options[:ip] || address,
+      :port       => options[:port] || port,
+      :path       => path,
+      :username   => options[:user] || authentication_userid(options[:auth_type]),
+      :password   => options[:pass] || authentication_password(options[:auth_type]),
+      :service    => options[:service] || "Service",
+      :verify_ssl => default_endpoint.verify_ssl,
+      :ca_certs   => default_endpoint.certificate_authority
+    }
+
+    # Starting with version 4 of oVirt authentication doesn't work when using directly the IP address, it requires
+    # the fully qualified host name, so if we received an IP address we try to convert it into the corresponding
+    # host name:
+    if resolve_ip_addresses?
+      resolved = resolve_ip_address(connect_options[:server])
+      if resolved != connect_options[:server]
+        _log.info("IP address '#{connect_options[:server]}' has been resolved to host name '#{resolved}'.")
+        default_endpoint.hostname = resolved
+        connect_options[:server] = resolved
+      end
+    end
 
     # Create the underlying connection according to the version of the oVirt API requested by
     # the caller:
     connect_method = "raw_connect_v#{version}".to_sym
-    connection = self.class.public_send(connect_method, server, port, path, username, password, service)
+    connection = self.class.public_send(connect_method, connect_options)
 
     # Copy the API path to the endpoints table:
-    default_endpoint.path = version == 4 ? '/ovirt-engine/api' : connection.api_path
+    default_endpoint.path = version.to_i == 4 ? '/ovirt-engine/api' : connection.api_path
 
     connection
   end
@@ -50,14 +73,14 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
     cacher = Cacher.new(cache_key)
     current_cache_val = cacher.read
     force = current_cache_val.blank?
-    cacher.fetch_fresh(last_refresh_date, :force => force) { supported_api_verions_from_sdk }
+    cacher.fetch_fresh(last_refresh_date, :force => force) { supported_api_versions_from_sdk }
   end
 
   def cache_key
     "REDHAT_EMS_CACHE_KEY_#{id}"
   end
 
-  def supported_api_verions_from_sdk
+  def supported_api_versions_from_sdk
     username = authentication_userid(:basic)
     password = authentication_password(:basic)
     probe_args = { :host => hostname, :port => port, :username => username, :password => password, :insecure => true }
@@ -88,6 +111,13 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
     @rhevm_inventory ||= connect(:service => "Inventory")
   end
 
+  def ovirt_services
+    @ovirt_services ||= begin
+                          ManageIQ::Providers::Redhat::InfraManager::OvirtServices::Builder.new(self)
+                                                                                           .build.new(:ems => self)
+                        end
+  end
+
   def with_provider_connection(options = {})
     raise "no block given" unless block_given?
     _log.info("Connecting through #{self.class.name}: [#{name}]")
@@ -114,7 +144,7 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
 
   def verify_credentials_for_rhevm(options = {})
     require 'ovirt'
-    with_provider_connection(options, &:api)
+    with_provider_connection(options) { |connection| connection.test(true) }
   rescue SocketError, Errno::EHOSTUNREACH, Errno::ENETUNREACH
     _log.warn($ERROR_INFO)
     raise MiqException::MiqUnreachableError, $ERROR_INFO
@@ -129,12 +159,12 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
 
   def rhevm_metrics_connect_options(options = {})
     metrics_hostname = connection_configuration_by_role('metrics')
-      .try(:endpoint)
-      .try(:hostname)
+                       .try(:endpoint)
+                       .try(:hostname)
     server   = options[:hostname] || metrics_hostname || hostname
     username = options[:user] || authentication_userid(:metrics)
     password = options[:pass] || authentication_password(:metrics)
-    database = options[:database]
+    database = options[:database] || history_database_name
 
     {
       :host     => server,
@@ -169,7 +199,7 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
 
   def authentications_to_validate
     at = [:default]
-    at << :metrics if self.has_authentication_type?(:metrics)
+    at << :metrics if has_authentication_type?(:metrics)
     at
   end
 
@@ -184,23 +214,7 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
   end
 
   def history_database_name
-    @history_database_name ||= begin
-                                 version = version_3_0? ? '3_0' : '>3_0'
-                                 self.class.history_database_name_for(version)
-                               end
-  end
-
-  def version_3_0?
-    if @version_3_0.nil?
-      @version_3_0 =
-        if api_version.nil?
-          with_provider_connection(&:version_3_0?)
-        else
-          api_version.starts_with?("3.0")
-        end
-    end
-
-    @version_3_0
+    connection_configurations.try(:metrics).try(:endpoint).try(:path) || self.class.default_history_database_name
   end
 
   # Adding disks is supported only by API version 4.0
@@ -221,6 +235,15 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
 
   def highest_supported_api_version
     supported_api_versions.sort.last
+  end
+
+  def highest_allowed_api_version
+    return 3 unless use_ovirt_sdk?
+    highest_supported_api_version
+  end
+
+  def use_ovirt_sdk?
+    ::Settings.ems.ems_redhat.use_ovirt_engine_sdk
   end
 
   class_methods do
@@ -253,53 +276,69 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
     end
 
     # Connect to the engine using version 4 of the API and the `ovirt-engine-sdk` gem.
-    def raw_connect_v4(server, port, path, username, password, service, scheme = 'https')
+    def raw_connect_v4(options = {})
       require 'ovirtsdk4'
 
       # Get the timeout from the configuration:
-      timeout, = ems_timeouts(:ems_redhat, service)
+      timeout, = ems_timeouts(:ems_redhat, options[:service])
 
-      # Create the connection:
+      # The constructor of the SDK expects a list of certificates, but that list can't be empty, or contain only 'nil'
+      # values, so we need to check the value passed and make a list only if it won't be empty. If it will be empty then
+      # we should just pass 'nil'.
+      ca_certs = options[:ca_certs]
+      ca_certs = [ca_certs] if ca_certs
+
+      url = URI::Generic.build(
+        :scheme => options[:scheme],
+        :host   => options[:server],
+        :port   => options[:port],
+        :path   => options[:path] || '/ovirt-engine/api'
+      )
+
       OvirtSDK4::Connection.new(
-        :url      => "#{scheme}://#{server}:#{port}#{path}",
-        :username => username,
-        :password => password,
+        :url      => url.to_s,
+        :username => options[:username],
+        :password => options[:password],
         :timeout  => timeout,
-        :insecure => true,
+        :insecure => options[:verify_ssl] == OpenSSL::SSL::VERIFY_NONE,
+        :ca_certs => ca_certs,
         :log      => $rhevm_log,
       )
     end
 
     # Connect to the engine using version 3 of the API and the `ovirt` gem.
-    def raw_connect_v3(server, port, path, username, password, service)
+    def raw_connect_v3(options = {})
       require 'ovirt'
       require 'ovirt_provider/inventory/ovirt_inventory'
       Ovirt.logger = $rhevm_log
 
       params = {
-        :server     => server,
-        :port       => port.presence && port.to_i,
-        :path       => path,
-        :username   => username,
-        :password   => password,
-        :verify_ssl => false
+        :server     => options[:server],
+        :port       => options[:port].presence && options[:port].to_i,
+        :path       => options[:path],
+        :username   => options[:username],
+        :password   => options[:password],
+        :verify_ssl => options[:verify_ssl],
+        :ca_certs   => options[:ca_certs]
       }
 
-      read_timeout, open_timeout = ems_timeouts(:ems_redhat, service)
+      read_timeout, open_timeout = ems_timeouts(:ems_redhat, options[:service])
       params[:timeout]      = read_timeout if read_timeout
       params[:open_timeout] = open_timeout if open_timeout
-      const = service == "Inventory" ? OvirtInventory : Ovirt.const_get(service)
-      const.new(params)
+      const = options[:service] == "Inventory" ? OvirtInventory : Ovirt.const_get(options[:service])
+      conn = const.new(params)
+      OvirtConnectionDecorator.new(conn)
     end
 
-    def history_database_name_for(api_version)
-      require 'ovirt_metrics'
-      case api_version
-      when '3_0'
-        OvirtMetrics::DEFAULT_HISTORY_DATABASE_NAME_3_0
-      else
-        OvirtMetrics::DEFAULT_HISTORY_DATABASE_NAME
+    class OvirtConnectionDecorator < SimpleDelegator
+      def test(_raise_exceptions)
+        api
       end
+    end
+
+    def default_history_database_name
+      require 'ovirt_metrics'
+      OvirtMetrics::DEFAULT_HISTORY_DATABASE_NAME
     end
 
     # Calculates an "ems_ref" from the "href" attribute provided by the oVirt REST API, removing the
@@ -323,7 +362,7 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
 
     def fetch_fresh(last_refresh_time, options)
       force = options[:force] || stale_cache?(last_refresh_time)
-      res = Rails.cache.fetch(key, force: force) { build_entry { yield } }
+      res = Rails.cache.fetch(key, :force => force) { build_entry { yield } }
       res[:value]
     end
 
@@ -342,6 +381,42 @@ module ManageIQ::Providers::Redhat::InfraManager::ApiIntegration
       current_val = Rails.cache.read(key)
       return true unless current_val && current_val[:created_at] && last_refresh_time
       last_refresh_time > current_val[:created_at]
+    end
+  end
+
+  private
+
+  #
+  # Checks if IP address to host name resolving is enabled.
+  #
+  # @return [Boolean] `true` if host name resolving is enabled in the configuration, `false` otherwise.
+  #
+  def resolve_ip_addresses?
+    ::Settings.ems.ems_redhat.resolve_ip_addresses
+  end
+
+  #
+  # Tries to convert the given IP address into a host name, doing a reverse DNS lookup if needed. If it
+  # isn't possible to find the host name the original IP address will be returned, and a warning will be
+  # written to the log.
+  #
+  # @param address [String] The IP address.
+  # @return [String] The host name.
+  #
+  def resolve_ip_address(address)
+    # Don't try to resolve unless the string is really an IP address and not a host name:
+    return address unless address =~ Resolv::IPv4::Regex || address =~ Resolv::IPv6::Regex
+
+    # Try to do a reverse resolve of the address to find the host name, using the default resolver, which
+    # means first using the local hosts file and then DNS:
+    begin
+      Resolv.getname(address)
+    rescue Resolv::ResolvError
+      _log.warn(
+        "Can't find fully qualified host name for IP address '#{address}', will use the IP address " \
+        "directly."
+      )
+      address
     end
   end
 end

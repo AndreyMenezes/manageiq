@@ -9,16 +9,16 @@ module EmsRefresh::SaveInventory
       ManagerRefresh::SaveInventory.save_inventory(ems, hashes.values)
       return
     end
+
     case ems
     when EmsCloud                                           then save_ems_cloud_inventory(ems, hashes, target)
     when EmsInfra                                           then save_ems_infra_inventory(ems, hashes, target)
-    when ManageIQ::Providers::PhysicalInfraManager          then save_ems_physical_infra_inventory(ems, hashes, target)
+    when EmsPhysicalInfra                                   then save_ems_physical_infra_inventory(ems, hashes, target)
     when ManageIQ::Providers::AutomationManager             then save_automation_manager_inventory(ems, hashes, target)
     when ManageIQ::Providers::ConfigurationManager          then save_configuration_manager_inventory(ems, hashes, target)
     when ManageIQ::Providers::ContainerManager              then save_ems_container_inventory(ems, hashes, target)
     when ManageIQ::Providers::NetworkManager                then save_ems_network_inventory(ems, hashes, target)
     when ManageIQ::Providers::StorageManager                then save_ems_storage_inventory(ems, hashes, target)
-    when ManageIQ::Providers::MiddlewareManager             then save_ems_middleware_inventory(ems, hashes, target)
     when ManageIQ::Providers::DatawarehouseManager          then save_ems_datawarehouse_inventory(ems, hashes, target)
     end
   end
@@ -40,7 +40,7 @@ module EmsRefresh::SaveInventory
                     []
                   end
 
-    child_keys = [:operating_system, :hardware, :custom_attributes, :snapshots, :advanced_settings]
+    child_keys = [:operating_system, :hardware, :custom_attributes, :snapshots, :advanced_settings, :labels, :tags]
     extra_infra_keys = [:host, :ems_cluster, :storage, :storages, :storage_profile, :raw_power_state, :parent_vm]
     extra_cloud_keys = [
       :flavor,
@@ -155,7 +155,7 @@ module EmsRefresh::SaveInventory
         parent = vms[h.fetch_path(:parent_vm, :id)]
         child = vms[h[:id]]
 
-        parent.with_relationship_type('genealogy') { parent.set_child(child) } if parent && child
+        child.with_relationship_type('genealogy') { child.parent = parent } if parent && child
       end
     end
 
@@ -181,6 +181,26 @@ module EmsRefresh::SaveInventory
     end
   end
 
+  # Convert all mapped hashes into actual tags and associate them with the object.
+  # The collection or collection[:tags] object should be an array of hashes, probably
+  # created by the ContainerLabelTagMapping.map_labels method. Each hash in the array
+  # should have the following basic structure:
+  #
+  # {:category_tag_id=>139, :entry_name=>"foo", :entry_description=>"bar"}
+  #
+  # The +collection+ argument can either be a Hash, in which case the argument
+  # should have a single :tags key, or a simple Array of hashes.
+  #
+  def save_tags_inventory(object, collection, _target = nil)
+    return if collection.blank?
+    tags = collection.kind_of?(Hash) ? collection[:tags] : collection
+    ContainerLabelTagMapping.retag_entity(object, tags)
+  rescue => err
+    raise if EmsRefresh.debug_failures
+    _log.error("Auto-tagging failed on #{object.class} [#{object.name}] with error [#{err}].")
+    _log.log_backtrace(err)
+  end
+
   def save_operating_system_inventory(parent, hash)
     return if hash.nil?
 
@@ -194,7 +214,7 @@ module EmsRefresh::SaveInventory
 
   def save_hardware_inventory(parent, hash)
     return if hash.nil?
-    save_inventory_single(:hardware, parent, hash, [:disks, :guest_devices, :networks])
+    save_inventory_single(:hardware, parent, hash, [:disks, :guest_devices, :networks, :firmwares])
     parent.save!
   end
 
@@ -255,6 +275,16 @@ module EmsRefresh::SaveInventory
     when :scan
       save_inventory_multi(hardware.networks, hashes, :use_association, [:description, :guid])
     end
+  end
+
+  def save_firmwares_inventory(hardware, hashes)
+    return if hashes.nil?
+
+    save_inventory_multi(hardware.firmwares, hashes, :use_association, [:name])
+  end
+
+  def save_computer_system_inventory(parent, hash, _target = nil)
+    save_inventory_single(:computer_system, parent, hash, [:hardware, :operating_system])
   end
 
   def save_system_services_inventory(parent, hashes, mode = :refresh)
@@ -332,7 +362,7 @@ module EmsRefresh::SaveInventory
         return existing_vm
       end
 
-      ems = ExtManagementSystem.find_by_id(target_hash[:ems_id])
+      ems = ExtManagementSystem.find_by(:id => target_hash[:ems_id])
       old_cluster = get_cluster(ems, target_hash[:cluster], target_hash[:resource_pools], target_hash[:folders])
 
       vm_hash[:ems_cluster_id] = old_cluster[:id]

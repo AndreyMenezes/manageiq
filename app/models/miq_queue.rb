@@ -157,31 +157,22 @@ class MiqQueue < ApplicationRecord
 
     prefetch_max_per_worker = Settings.server.prefetch_max_per_worker
     msgs = MiqQueue.where(cond).order("priority, id").limit(prefetch_max_per_worker)
-    return nil if msgs.empty? # Nothing available in the queue
 
     result = nil
     msgs.each do |msg|
       begin
         _log.info("#{MiqQueue.format_short_log_msg(msg)} previously timed out, retrying...") if msg.state == STATE_TIMEOUT
-        w = MiqWorker.server_scope.find_by(:pid => Process.pid)
-        if w.nil?
-          msg.update_attributes!(:state => STATE_DEQUEUE, :handler => MiqServer.my_server)
-        else
-          msg.update_attributes!(:state => STATE_DEQUEUE, :handler => w)
-        end
-        result = msg
-        break
+        handler = MiqWorker.my_worker || MiqServer.my_server
+        msg.update_attributes!(:state => STATE_DEQUEUE, :handler => handler)
+        _log.info("#{MiqQueue.format_full_log_msg(msg)}, Dequeued in: [#{Time.now.utc - msg.created_on}] seconds")
+        return msg
       rescue ActiveRecord::StaleObjectError
         result = :stale
       rescue => err
         raise _("%{log_message} \"%{error}\" attempting to get next message") % {:log_message => _log.prefix, :error => err}
       end
     end
-    if result == :stale
-      _log.debug("All #{prefetch_max_per_worker} messages stale, returning...")
-    else
-      _log.info("#{MiqQueue.format_full_log_msg(result)}, Dequeued in: [#{Time.now - result.created_on}] seconds")
-    end
+    _log.debug("All #{prefetch_max_per_worker} messages stale, returning...") if result == :stale
     result
   end
 
@@ -357,13 +348,11 @@ class MiqQueue < ApplicationRecord
         _log.error("#{MiqQueue.format_short_log_msg(self)}, #{message}")
         status = STATUS_TIMEOUT
       end
-    rescue SystemExit
-      raise
     rescue MiqException::MiqQueueExpired
       message = "Expired on [#{expires_on}]"
       _log.error("#{MiqQueue.format_short_log_msg(self)}, #{message}")
       status = STATUS_EXPIRED
-    rescue Exception => error
+    rescue StandardError, SyntaxError => error
       _log.error("#{MiqQueue.format_short_log_msg(self)}, Error: [#{error}]")
       _log.log_backtrace(error) unless error.kind_of?(MiqException::Error)
       status = STATUS_ERROR

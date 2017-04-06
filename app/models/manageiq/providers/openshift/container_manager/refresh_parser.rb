@@ -1,26 +1,20 @@
 module ManageIQ::Providers
   module Openshift
     class ContainerManager::RefreshParser < ManageIQ::Providers::Kubernetes::ContainerManager::RefreshParser
-      def ems_inv_to_hashes(inventory)
-        super(inventory)
+      def ems_inv_to_hashes(inventory, options = Config::Options.new)
+        super(inventory, options)
         get_projects(inventory)
         get_routes(inventory)
         get_builds(inventory)
         get_build_pods(inventory)
         get_templates(inventory)
-        get_openshift_images(inventory)
+        get_openshift_images(inventory) if options.get_container_images
         EmsRefresh.log_inv_debug_trace(@data, "data:")
         @data
       end
 
       def get_openshift_images(inventory)
-        process_collection(inventory["image"], :container_images) { |n| parse_openshift_image(n) }
-        @data[:container_images].uniq! { |n| n[:image_ref] }
-
-        @data[:container_images].each do |ns|
-          @data_index.store_path(:container_images, :by_name, ns[:name], ns)
-          @data_index.store_path(:container_images, :by_image_ref, ns[:image_ref], ns)
-        end
+        inventory["image"].each { |img| parse_openshift_image(img) }
       end
 
       def get_builds(inventory)
@@ -61,7 +55,7 @@ module ManageIQ::Providers
 
       def parse_project(project_item)
         project = @data_index.fetch_path(:container_projects, :by_name, project_item.metadata.name)
-        project.merge!(:display_name => project_item.metadata.annotations['openshift.io/display-name']) unless
+        project[:display_name] = project_item.metadata.annotations['openshift.io/display-name'] unless
             project_item.metadata.annotations.nil?
       end
 

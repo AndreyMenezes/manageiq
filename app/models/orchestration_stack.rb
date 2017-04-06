@@ -14,9 +14,14 @@ class OrchestrationStack < ApplicationRecord
 
   belongs_to :ext_management_system, :foreign_key => :ems_id
 
+  has_many   :authentication_orchestration_stacks
+  has_many   :authentications, :through => :authentication_orchestration_stacks
   has_many   :parameters, :dependent => :destroy, :foreign_key => :stack_id, :class_name => "OrchestrationStackParameter"
   has_many   :outputs,    :dependent => :destroy, :foreign_key => :stack_id, :class_name => "OrchestrationStackOutput"
   has_many   :resources,  :dependent => :destroy, :foreign_key => :stack_id, :class_name => "OrchestrationStackResource"
+
+  has_many   :authentication_orchestration_stacks, :dependent => :destroy
+  has_many   :authentications, :through => :authentication_orchestration_stacks
 
   has_many   :direct_vms,             :class_name => "ManageIQ::Providers::CloudManager::Vm"
   has_many   :direct_security_groups, :class_name => "SecurityGroup"
@@ -35,6 +40,8 @@ class OrchestrationStack < ApplicationRecord
   virtual_total :total_vms, :vms
   virtual_total :total_security_groups, :security_groups
   virtual_total :total_cloud_networks, :cloud_networks
+
+  virtual_column :stdout, :type => :string
 
   alias_method :orchestration_stack_parameters, :parameters
   alias_method :orchestration_stack_outputs,    :outputs
@@ -71,6 +78,11 @@ class OrchestrationStack < ApplicationRecord
   def directs_and_indirects(direct_attrs)
     MiqPreloader.preload_and_map(subtree, direct_attrs)
   end
+
+  def stdout(format = nil)
+    format.nil? ? try(:raw_stdout) : try(:raw_stdout, format)
+  end
+
   private :directs_and_indirects
 
   def self.create_stack(orchestration_manager, stack_name, template, options = {})
@@ -83,6 +95,22 @@ class OrchestrationStack < ApplicationRecord
 
   def raw_update_stack(_template, _options = {})
     raise NotImplementedError, _("raw_update_stack must be implemented in a subclass")
+  end
+
+  def update_stack_queue(userid, template, options = {})
+    task_opts = {
+      :action => "updating Orchestration Stack for user #{userid}",
+      :userid => userid
+    }
+    queue_opts = {
+      :class_name  => self.class.name,
+      :method_name => 'update_stack',
+      :instance_id => id,
+      :role        => 'ems_operations',
+      :zone        => ext_management_system.my_zone,
+      :args        => [template, options]
+    }
+    MiqTask.generic_action_with_callback(task_opts, queue_opts)
   end
 
   def update_stack(template, options = {})

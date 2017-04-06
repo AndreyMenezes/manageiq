@@ -1,9 +1,5 @@
 class Chargeback
   class ConsumptionHistory
-    VIRTUAL_COL_USES = {
-      'v_derived_cpu_total_cores_used' => 'cpu_usage_rate_average'
-    }.freeze
-
     def self.for_report(cb_class, options)
       base_rollup = base_rollup_scope
       timerange = options.report_time_range
@@ -16,6 +12,8 @@ class Chargeback
           yield(consumption) unless consumption.consumed_hours_in_interval.zero?
         end
 
+        next unless options.include_metrics?
+
         records = base_rollup.where(:timestamp => query_start_time...query_end_time, :capture_interval_name => 'hourly')
         records = cb_class.where_clause(records, options)
         records = Metric::Helper.remove_duplicate_timestamps(records)
@@ -25,10 +23,8 @@ class Chargeback
         # we are building hash with grouped calculated values
         # values are grouped by resource_id and timestamp (query_start_time...query_end_time)
         records.group_by(&:resource_id).each do |_, metric_rollup_records|
-          metric_rollup_records = metric_rollup_records.select { |x| x.resource.present? }
           consumption = ConsumptionWithRollups.new(metric_rollup_records, query_start_time, query_end_time)
-          next if metric_rollup_records.empty?
-          yield(consumption)
+          yield(consumption) unless consumption.consumed_hours_in_interval.zero?
         end
       end
     end
@@ -43,13 +39,9 @@ class Chargeback
         :parent_ems         => :tags)
                                 .select(*Metric::BASE_COLS).order('resource_id, timestamp')
 
-      perf_cols = MetricRollup.attribute_names
-      rate_cols = ChargebackRate.where(:default => true).flat_map do |rate|
-        rate.chargeback_rate_details.map(&:metric).select { |metric| perf_cols.include?(metric.to_s) }
-      end
-      rate_cols.map! { |x| VIRTUAL_COL_USES[x] || x }.flatten!
-      base_rollup.select(*rate_cols)
+      base_rollup.select(*ChargeableField.chargeable_cols_on_metric_rollup).with_resource
     end
+
     private_class_method :base_rollup_scope
   end
 end

@@ -1,4 +1,5 @@
 class CloudTenant < ApplicationRecord
+  include CloudTenancyMixin
   TENANT_MAPPING_ASSOCIATIONS = %i(vms_and_templates).freeze
 
   include NewWithTypeStiMixin
@@ -37,7 +38,7 @@ class CloudTenant < ApplicationRecord
   end
 
   def self.create_cloud_tenant(ems_id, options = {})
-    ext_management_system = ExtManagementSystem.find_by_id(ems_id)
+    ext_management_system = ExtManagementSystem.find_by(:id => ems_id)
     raise ArgumentError, _("ext_management_system cannot be nil") if ext_management_system.nil?
 
     klass = class_by_ems(ext_management_system)
@@ -157,5 +158,9 @@ class CloudTenant < ApplicationRecord
       :method_name => 'sync_cloud_tenants_with_tenants',
       :zone        => ems.my_zone
     ) if ems.supports_cloud_tenant_mapping?
+  end
+
+  def self.tenant_joins_clause(scope)
+    scope.includes(:source_tenant).includes(:ext_management_system)
   end
 end

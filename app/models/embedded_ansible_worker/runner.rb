@@ -1,33 +1,32 @@
 class EmbeddedAnsibleWorker::Runner < MiqWorker::Runner
+  self.wait_for_worker_monitor = false
+
   def prepare
-    update_embedded_ansible_manager
-
-    Thread.new do
-      setup_ansible
-      started_worker_record
-    end
-
+    ObjectSpace.garbage_collect
+    # Overriding prepare so we can set started when we're ready
+    do_before_work_loop
+    started_worker_record
     self
   end
 
-  # This thread runs forever until a stop request is received, which with send us to do_exit to exit our thread
-  def do_work_loop
-    Thread.new do
-      _log.info("waiting for ansible to start...")
-      loop do
-        # handle if the ansible setup blew up or timed out
-        break if worker.reload.started?
-        heartbeat
-        send(poll_method)
-      end
+  def do_before_work_loop
+    setup_ansible
+    update_embedded_ansible_provider
+  rescue => err
+    _log.log_backtrace(err)
+    do_exit(err.message, 1)
+  end
 
-      _log.info("entering ansible monitor loop")
-      loop do
-        heartbeat
-        do_work
-        send(poll_method)
-      end
-    end
+  def heartbeat
+    super if EmbeddedAnsible.alive?
+  end
+
+  def do_work
+    EmbeddedAnsible.start if !EmbeddedAnsible.alive? && !EmbeddedAnsible.running?
+  end
+
+  def before_exit(*_)
+    EmbeddedAnsible.disable
   end
 
   def setup_ansible
@@ -37,36 +36,29 @@ class EmbeddedAnsibleWorker::Runner < MiqWorker::Runner
     _log.info("calling EmbeddedAnsible.start")
     EmbeddedAnsible.start
     _log.info("calling EmbeddedAnsible.start finished")
+
+    raise_role_notification
   end
 
-  def do_work
-    if EmbeddedAnsible.running?
-      _log.info("#{log_prefix} supervisord is ok!")
-    else
-      _log.warn("#{log_prefix} supervisord is not running, restarting!")
-      EmbeddedAnsible.start
-    end
-  end
+  def update_embedded_ansible_provider
+    server   = MiqServer.my_server(true)
+    provider = ManageIQ::Providers::EmbeddedAnsible::Provider.first_or_initialize
 
-  # Because we're running in a thread on the Server
-  # we need to intercept SystemExit and exit our thread,
-  # not the main server thread!
-  def do_exit(*args)
-    # ensure this doesn't fail or that we can still get to the super call
-    EmbeddedAnsible.disable
-    super
-  rescue SystemExit
-    _log.info("#{log_prefix} SystemExit received, exiting monitoring Thread")
-    Thread.exit
-  end
+    provider.name = "Embedded Ansible"
+    provider.zone = server.zone
+    provider.url  = URI::HTTPS.build(:host => server.hostname || server.ipaddress, :path => "/ansibleapi/v1").to_s
+    provider.verify_ssl = 0
 
-  def update_embedded_ansible_manager
-    ansible = ManageIQ::Providers::EmbeddedAnsible::AutomationManager.first_or_initialize
-    server  = MiqServer.my_server(true)
-    ansible.default_endpoint.url = URI::HTTPS.build(:host => server.hostname, :path => "/ansibleapi/v1")
-    ansible.name = "Embedded Ansible"
-    ansible.zone = server.zone
-    ansible.save!
+    provider.save!
+
+    api_connection = EmbeddedAnsible.api_connection
+    worker.remove_demo_data(api_connection)
+    worker.ensure_initial_objects(provider, api_connection)
+
+    admin_auth = MiqDatabase.first.ansible_admin_authentication
+
+    provider.update_authentication(:default => {:userid => admin_auth.userid, :password => admin_auth.password})
+    provider.authentication_check
   end
 
   # Base class methods we override since we don't have a separate process.  We might want to make these opt-in features in the base class that this subclass can choose to opt-out.
@@ -74,4 +66,14 @@ class EmbeddedAnsibleWorker::Runner < MiqWorker::Runner
   def set_connection_pool_size; end
   def message_sync_active_roles(*_args); end
   def message_sync_config(*_args); end
+
+  private
+
+  def raise_role_notification
+    notification_options = {
+      :role_name   => ServerRole.find_by(:name => worker.class.required_roles.first).description,
+      :server_name => MiqServer.my_server.name
+    }
+    Notification.create(:type => :role_activate_success, :options => notification_options)
+  end
 end

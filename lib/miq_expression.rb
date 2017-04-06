@@ -77,6 +77,7 @@ class MiqExpression
 
   INCLUDE_TABLES = %w(
     advanced_settings
+    archived_container_groups
     audit_events
     availability_zones
     cloud_networks
@@ -349,10 +350,8 @@ class MiqExpression
   def load_virtual_custom_attributes
     return unless @exp
 
-    custom_attributes_group_by_model = custom_attribute_columns_and_models.compact.group_by { |x| x[:model] }
-
-    custom_attributes_group_by_model.each do |model, custom_attribute|
-      model.load_custom_attributes_for(custom_attribute.map { |x| x[:column] })
+    fields.compact.select { |x| x.instance_of?(MiqExpression::Field) && x.custom_attribute_column? }.each do |field|
+      field.model.add_custom_attribute(field.column)
     end
   end
 
@@ -458,34 +457,36 @@ class MiqExpression
     return exp unless exp.kind_of?(Hash)
 
     operator = exp.keys.first
-    case operator.downcase
+    op_args = exp[operator]
+    col_name = op_args["field"] if op_args.kind_of?(Hash)
+    operator = operator.downcase
+
+    case operator
     when "equal", "=", "<", ">", ">=", "<=", "!="
-      operands = operands2rubyvalue(operator, exp[operator], context_type)
+      operands = operands2rubyvalue(operator, op_args, context_type)
       clause = operands.join(" #{normalize_ruby_operator(operator)} ")
     when "before"
-      col_type = get_col_type(exp[operator]["field"]) if exp[operator]["field"]
-      col_name = exp[operator]["field"]
+      col_type = get_col_type(col_name) if col_name
       col_ruby, = operands2rubyvalue(operator, {"field" => col_name}, context_type)
-      val = exp[operator]["value"]
+      val = op_args["value"]
       clause = ruby_for_date_compare(col_ruby, col_type, tz, "<", val)
     when "after"
-      col_type = get_col_type(exp[operator]["field"]) if exp[operator]["field"]
-      col_name = exp[operator]["field"]
+      col_type = get_col_type(col_name) if col_name
       col_ruby, = operands2rubyvalue(operator, {"field" => col_name}, context_type)
-      val = exp[operator]["value"]
+      val = op_args["value"]
       clause = ruby_for_date_compare(col_ruby, col_type, tz, nil, nil, ">", val)
     when "includes all"
-      operands = operands2rubyvalue(operator, exp[operator], context_type)
+      operands = operands2rubyvalue(operator, op_args, context_type)
       clause = "(#{operands[0]} & #{operands[1]}) == #{operands[1]}"
     when "includes any"
-      operands = operands2rubyvalue(operator, exp[operator], context_type)
+      operands = operands2rubyvalue(operator, op_args, context_type)
       clause = "(#{operands[1]} - #{operands[0]}) != #{operands[1]}"
     when "includes only", "limited to"
-      operands = operands2rubyvalue(operator, exp[operator], context_type)
+      operands = operands2rubyvalue(operator, op_args, context_type)
       clause = "(#{operands[0]} - #{operands[1]}) == []"
     when "like", "not like", "starts with", "ends with", "includes"
-      operands = operands2rubyvalue(operator, exp[operator], context_type)
-      case operator.downcase
+      operands = operands2rubyvalue(operator, op_args, context_type)
+      case operator
       when "starts with"
         operands[1] = "/^" + re_escape(operands[1].to_s) + "/"
       when "ends with"
@@ -494,9 +495,9 @@ class MiqExpression
         operands[1] = "/" + re_escape(operands[1].to_s) + "/"
       end
       clause = operands.join(" #{normalize_ruby_operator(operator)} ")
-      clause = "!(" + clause + ")" if operator.downcase == "not like"
+      clause = "!(" + clause + ")" if operator == "not like"
     when "regular expression matches", "regular expression does not match"
-      operands = operands2rubyvalue(operator, exp[operator], context_type)
+      operands = operands2rubyvalue(operator, op_args, context_type)
 
       # If it looks like a regular expression, sanitize from forward
       # slashes and interpolation
@@ -516,26 +517,26 @@ class MiqExpression
       end
       clause = operands.join(" #{normalize_ruby_operator(operator)} ")
     when "and", "or"
-      clause = "(" + exp[operator].collect { |operand| _to_ruby(operand, context_type, tz) }.join(" #{normalize_ruby_operator(operator)} ") + ")"
+      clause = "(" + op_args.collect { |operand| _to_ruby(operand, context_type, tz) }.join(" #{normalize_ruby_operator(operator)} ") + ")"
     when "not", "!"
-      clause = normalize_ruby_operator(operator) + "(" + _to_ruby(exp[operator], context_type, tz) + ")"
+      clause = normalize_ruby_operator(operator) + "(" + _to_ruby(op_args, context_type, tz) + ")"
     when "is null", "is not null", "is empty", "is not empty"
-      operands = operands2rubyvalue(operator, exp[operator], context_type)
+      operands = operands2rubyvalue(operator, op_args, context_type)
       clause = operands.join(" #{normalize_ruby_operator(operator)} ")
     when "contains"
-      exp[operator]["tag"] ||= exp[operator]["field"]
+      op_args["tag"] ||= col_name
       operands = if context_type != "hash"
-                   ref, val = value2tag(preprocess_managed_tag(exp[operator]["tag"]), exp[operator]["value"])
+                   ref, val = value2tag(preprocess_managed_tag(op_args["tag"]), op_args["value"])
                    ["<exist ref=#{ref}>#{val}</exist>"]
                  elsif context_type == "hash"
                    # This is only for supporting reporting "display filters"
                    # In the report object the tag value is actually the description and not the raw tag name.
                    # So we have to trick it by replacing the value with the description.
-                   description = MiqExpression.get_entry_details(exp[operator]["tag"]).inject("") do |s, t|
-                     break(t.first) if t.last == exp[operator]["value"]
+                   description = MiqExpression.get_entry_details(op_args["tag"]).inject("") do |s, t|
+                     break(t.first) if t.last == op_args["value"]
                      s
                    end
-                   val = exp[operator]["tag"].split(".").last.split("-").join(".")
+                   val = op_args["tag"].split(".").last.split("-").join(".")
                    fld = "<value type=string>#{val}</value>"
                    [fld, quote(description, "string")]
                  end
@@ -543,39 +544,38 @@ class MiqExpression
     when "find"
       # FIND Vm.users-name = 'Administrator' CHECKALL Vm.users-enabled = 1
       check = nil
-      check = "checkall" if exp[operator].include?("checkall")
-      check = "checkany" if exp[operator].include?("checkany")
-      if exp[operator].include?("checkcount")
+      check = "checkall" if op_args.include?("checkall")
+      check = "checkany" if op_args.include?("checkany")
+      if op_args.include?("checkcount")
         check = "checkcount"
-        op = exp[operator][check].keys.first
-        exp[operator][check][op]["field"] = "<count>"
+        op = op_args[check].keys.first
+        op_args[check][op]["field"] = "<count>"
       end
       raise _("expression malformed,  must contain one of 'checkall', 'checkany', 'checkcount'") unless check
       check =~ /^check(.*)$/; mode = $1.downcase
-      clause = "<find><search>" + _to_ruby(exp[operator]["search"], context_type, tz) + "</search><check mode=#{mode}>" + _to_ruby(exp[operator][check], context_type, tz) + "</check></find>"
+      clause = "<find><search>" + _to_ruby(op_args["search"], context_type, tz) + "</search>" +
+               "<check mode=#{mode}>" + _to_ruby(op_args[check], context_type, tz) + "</check></find>"
     when "key exists"
-      clause = operands2rubyvalue(operator, exp[operator], context_type)
+      clause = operands2rubyvalue(operator, op_args, context_type)
     when "value exists"
-      clause = operands2rubyvalue(operator, exp[operator], context_type)
+      clause = operands2rubyvalue(operator, op_args, context_type)
     when "is"
-      col_name = exp[operator]["field"]
       col_ruby, dummy = operands2rubyvalue(operator, {"field" => col_name}, context_type)
       col_type = get_col_type(col_name)
-      value = exp[operator]["value"]
+      value = op_args["value"]
       clause = if col_type == :date && !RelativeDatetime.relative?(value)
                  ruby_for_date_compare(col_ruby, col_type, tz, "==", value)
                else
                  ruby_for_date_compare(col_ruby, col_type, tz, ">=", value, "<=", value)
                end
     when "from"
-      col_name = exp[operator]["field"]
       col_ruby, dummy = operands2rubyvalue(operator, {"field" => col_name}, context_type)
       col_type = get_col_type(col_name)
 
-      start_val, end_val = exp[operator]["value"]
+      start_val, end_val = op_args["value"]
       clause = ruby_for_date_compare(col_ruby, col_type, tz, ">=", start_val, "<=", end_val)
     else
-      raise _("operator '%{operator_name}' is not supported") % {:operator_name => operator}
+      raise _("operator '%{operator_name}' is not supported") % {:operator_name => operator.upcase}
     end
 
     # puts "clause: #{clause}"
@@ -921,7 +921,6 @@ class MiqExpression
 
   def self.operands2rubyvalue(operator, ops, context_type)
     # puts "Enter: operands2rubyvalue: operator: #{operator}, ops: #{ops.inspect}"
-    operator = operator.downcase
 
     if ops["field"]
       if ops["field"] == "<count>"
@@ -1052,8 +1051,19 @@ class MiqExpression
     tag
   end
 
+  def self.escape_virtual_custom_attribute(attribute)
+    if attribute.include?(CustomAttributeMixin::CUSTOM_ATTRIBUTES_PREFIX)
+      uri_parser = URI::RFC2396_Parser.new
+      [uri_parser.escape(attribute, /[^A-Za-z0-9:\-_]/), true]
+    else
+      [attribute, false]
+    end
+  end
+
   def self.value2tag(tag, val = nil)
+    tag, virtual_custom_attribute = escape_virtual_custom_attribute(tag)
     model, *values = tag.to_s.gsub(/[\.-]/, "/").split("/") # replace model path ".", column name "-" with "/"
+    values.map!{ |x|  URI::RFC2396_Parser.new.unescape(x) } if virtual_custom_attribute
 
     case values.first
     when "user_tag"
@@ -1072,26 +1082,25 @@ class MiqExpression
   end
 
   def self.normalize_ruby_operator(str)
-    str = str.upcase
     case str
-    when "EQUAL", "="
+    when "equal", "="
       "=="
-    when "NOT"
+    when "not"
       "!"
-    when "LIKE", "NOT LIKE", "STARTS WITH", "ENDS WITH", "INCLUDES", "REGULAR EXPRESSION MATCHES"
+    when "like", "not like", "starts with", "ends with", "includes", "regular expression matches"
       "=~"
-    when "REGULAR EXPRESSION DOES NOT MATCH"
+    when "regular expression does not match"
       "!~"
-    when "IS NULL", "IS EMPTY"
+    when "is null", "is empty"
       "=="
-    when "IS NOT NULL", "IS NOT EMPTY"
+    when "is not null", "is not empty"
       "!="
-    when "BEFORE"
+    when "before"
       "<"
-    when "AFTER"
+    when "after"
       ">"
     else
-      str.downcase
+      str
     end
   end
 
@@ -1164,10 +1173,10 @@ class MiqExpression
 
     klass.custom_keys.each do |custom_key|
       custom_detail_column = [model, CustomAttributeMixin::CUSTOM_ATTRIBUTES_PREFIX + custom_key].join("-")
-      custom_detail_name = custom_key
+      custom_detail_name = _("Labels: %{custom_key}") % { :custom_key => custom_key }
       if options[:include_model]
         model_name = Dictionary.gettext(model, :type => :model, :notfound => :titleize)
-        custom_detail_name = [model_name, custom_key].join(" : ")
+        custom_detail_name = [model_name, custom_detail_name].join(" : ")
       end
       custom_attributes_details.push([custom_detail_name, custom_detail_column])
     end
@@ -1566,35 +1575,6 @@ class MiqExpression
       e.values.any? { |e_exp| _quick_search?(e_exp) }
     else
       false
-    end
-  end
-
-  def custom_attribute_columns_and_models(expression = nil)
-    return custom_attribute_columns_and_models(exp).uniq if expression.nil?
-
-    case expression
-    when Array
-      expression.flat_map { |x| custom_attribute_columns_and_models(x) }
-    when Hash
-      expression_values = expression.values
-      return [] unless expression.keys.first
-
-      if expression.keys.first == "field"
-        begin
-          field = Field.parse(expression_values.first)
-        rescue StandardError => err
-          _log.error("Cannot parse field #{field}" + err.message)
-          _log.log_backtrace(err)
-        end
-
-        return [] unless field
-
-        field.custom_attribute_column? ? [:model => field.model, :column => field.column] : []
-      else
-        expression.keys.first.casecmp('find').try(:zero?) ? [] : custom_attribute_columns_and_models(expression_values)
-      end
-    else
-      []
     end
   end
 

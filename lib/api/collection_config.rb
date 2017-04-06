@@ -53,8 +53,8 @@ module Api
       self[collection_name]["#{target}_actions".to_sym]
     end
 
-    def typed_subcollection_actions(collection_name, subcollection_name)
-      self[collection_name]["#{subcollection_name}_subcollection_actions".to_sym]
+    def typed_subcollection_actions(collection_name, subcollection_name, target = :subcollection)
+      self[collection_name]["#{subcollection_name}_#{target}_actions".to_sym]
     end
 
     def typed_subcollection_action(collection_name, subcollection_name, method)
@@ -71,6 +71,13 @@ module Api
 
     def name_for_klass(resource_klass)
       @cfg.detect { |_, spec| spec[:klass] == resource_klass.name }.try(:first)
+    end
+
+    def name_for_subclass(resource_class)
+      @cfg.detect do |collection, _|
+        collection_class = klass(collection)
+        collection_class && (collection_class == resource_class || collection_class.descendants.include?(resource_class))
+      end.try(:first)
     end
 
     def what_refers_to_feature(product_feature_name)

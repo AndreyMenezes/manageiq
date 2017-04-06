@@ -24,7 +24,6 @@
 #
 describe "Policies API" do
   let(:zone)        { FactoryGirl.create(:zone, :name => "api_zone") }
-  let(:miq_server)  { FactoryGirl.create(:miq_server, :guid => miq_server_guid, :zone => zone) }
   let(:ems)         { FactoryGirl.create(:ems_vmware, :zone => zone) }
   let(:host)        { FactoryGirl.create(:host) }
 
@@ -412,6 +411,15 @@ describe "Policies API" do
       expect(policy.actions.count).to eq(1)
       expect(policy.events.count).to eq(1)
       expect(miq_policy.conditions.count).to eq(0)
+    end
+
+    it "edits just the description" do
+      api_basic_authorize collection_action_identifier(:policies, :edit)
+      expect(miq_policy.description).to_not eq("BAR")
+      run_post(policies_url(miq_policy.id), gen_request(:edit, :description => "BAR"))
+      policy = MiqPolicy.find(response.parsed_body["id"])
+      expect(response).to have_http_status(:ok)
+      expect(policy.description).to eq("BAR")
     end
   end
 end

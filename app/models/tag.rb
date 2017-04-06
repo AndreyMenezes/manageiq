@@ -11,7 +11,11 @@ class Tag < ApplicationRecord
   def self.list(object, options = {})
     ns = get_namespace(options)
     if ns[0..7] == "/virtual"
-      predicate = ns.split("/")[2..-1] # throw away /virtual
+      ns.gsub!('/virtual/','')  # throw away /virtual
+      ns, virtual_custom_attribute = MiqExpression.escape_virtual_custom_attribute(ns)
+      predicate = ns.split("/")
+      predicate.map!{ |x| URI::RFC2396_Parser.new.unescape(x) } if virtual_custom_attribute
+
       begin
         predicate.inject(object) { |target, method| target.public_send method }
       rescue NoMethodError
@@ -27,9 +31,16 @@ class Tag < ApplicationRecord
   end
 
   def self.tags(options = {})
-    query = Tag.includes(:taggings)
-    query = query.where(Tagging.arel_table[:taggable_type].eq options[:taggable_type])
-    query = query.where(Tag.arel_table[:name].matches "#{options[:ns]}%") if options[:ns]
+    query = Tag.joins(:taggings)
+
+    if options[:taggable_type].present?
+      query = query.where(Tagging.arel_table[:taggable_type].eq(options[:taggable_type]))
+    end
+
+    if options[:ns].present?
+      query = query.where(Tag.arel_table[:name].matches("#{options[:ns]}%"))
+    end
+
     Tag.filter_ns(query, options[:ns])
   end
 

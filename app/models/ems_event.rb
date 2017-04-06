@@ -25,7 +25,16 @@ class EmsEvent < EventStream
   end
 
   def self.event_groups
-    ::Settings.event_handling.event_groups.to_hash
+    core_event_groups = ::Settings.event_handling.event_groups.to_hash
+    Settings.ems.each_with_object(core_event_groups) do |(_provider_type, provider_settings), event_groups|
+      provider_event_groups = provider_settings.fetch_path(:event_handling, :event_groups)
+      next unless provider_event_groups
+      DeepMerge.deep_merge!(
+        provider_event_groups.to_hash, event_groups,
+        :preserve_unmergeables => false,
+        :overwrite_arrays      => false
+      )
+    end
   end
 
   def self.bottleneck_event_groups
@@ -58,50 +67,6 @@ class EmsEvent < EventStream
       :queue_name  => "ems",
       :role        => "event"
     )
-  end
-
-  def self.add_vc(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Vmware::InfraManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_rhevm(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Redhat::InfraManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_openstack(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Openstack::CloudManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_openstack_network(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Openstack::NetworkManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_cinder(ems_id, event)
-    add(ems_id, ManageIQ::Providers::StorageManager::CinderManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_swift(ems_id, event)
-    add(ems_id, ManageIQ::Providers::StorageManager::SwiftManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_openstack_infra(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Openstack::InfraManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_kubernetes(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Kubernetes::ContainerManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_azure(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Azure::CloudManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_google(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Google::CloudManager::EventParser.event_to_hash(event, ems_id))
-  end
-
-  def self.add_vmware_vcloud(ems_id, event)
-    add(ems_id, ManageIQ::Providers::Vmware::CloudManager::EventParser.event_to_hash(event, ems_id))
   end
 
   def self.add(ems_id, event_hash)
@@ -208,6 +173,17 @@ class EmsEvent < EventStream
     EmsEvent.where(:ems_id => ems_id, :chain_id => chain_id).order(:id).first
   end
 
+  def parse_event_metadata
+    data = full_data || {}
+    [
+      event_type == "datawarehouse_alert" ? message : nil,
+      data[:severity],
+      data[:url],
+      data[:ems_ref],
+      data[:resolved],
+    ]
+  end
+
   def first_chained_event
     @first_chained_event ||= EmsEvent.first_chained_event(ems_id, chain_id) || self
   end
@@ -240,12 +216,17 @@ class EmsEvent < EventStream
     target_type = "src_vm_or_template"  if target_type == "src_vm"
     target_type = "dest_vm_or_template" if target_type == "dest_vm"
     target_type = "middleware_server"   if event.event_type == "hawkular_alert"
+    target_type = "container_node"      if event.event_type == "datawarehouse_alert"
 
     event.send(target_type)
   end
 
   def tenant_identity
     (vm_or_template || ext_management_system).tenant_identity
+  end
+
+  def manager_refresh_targets
+    ext_management_system.class::EventTargetParser.new(self).parse
   end
 
   private

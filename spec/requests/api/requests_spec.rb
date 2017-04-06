@@ -67,7 +67,7 @@ RSpec.describe "Requests API" do
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to include("id"   => service_request.id,
-                                              "href" => a_string_matching(service_requests_url(service_request.id)))
+                                              "href" => a_string_matching(requests_url(service_request.id)))
     end
 
     it "lists all the service requests if you are admin" do
@@ -110,7 +110,7 @@ RSpec.describe "Requests API" do
 
       expected = {
         "id"   => service_request.id,
-        "href" => a_string_matching(service_requests_url(service_request.id))
+        "href" => a_string_matching(requests_url(service_request.id))
       }
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to include(expected)
@@ -254,6 +254,34 @@ RSpec.describe "Requests API" do
         "v_allowed_tags"   => [a_hash_including("children")],
         "v_workflow_class" => a_hash_including(
           "instance_logger" => a_hash_including("klass" => request.workflow.class.to_s))
+      )
+
+      expect(response.parsed_body).to match(expected_response)
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "can access attributes of its workflow" do
+      ems = FactoryGirl.create(:ems_vmware)
+      vm_template = FactoryGirl.create(:template_vmware, :name => "template1", :ext_management_system => ems)
+      request = FactoryGirl.create(:miq_provision_request,
+                                   :requester => @user,
+                                   :src_vm_id => vm_template.id,
+                                   :options   => {:owner_email => 'tester@example.com', :src_vm_id => vm_template.id})
+      FactoryGirl.create(:miq_dialog,
+                         :name        => "miq_provision_dialogs",
+                         :dialog_type => MiqProvisionWorkflow)
+
+      FactoryGirl.create(:classification_department_with_tags)
+
+      t = Classification.where(:description => 'Department', :parent_id => 0).includes(:tag).first
+      request.add_tag(t.name, t.children.first.name)
+
+      api_basic_authorize action_identifier(:requests, :read, :resource_actions, :get)
+      run_get requests_url(request.id), :attributes => "workflow.values"
+
+      expected_response = a_hash_including(
+        "id"       => request.id,
+        "workflow" => a_hash_including("values")
       )
 
       expect(response.parsed_body).to match(expected_response)
@@ -415,6 +443,23 @@ RSpec.describe "Requests API" do
       }
       expect(response.parsed_body).to include(expected)
       expect(response).to have_http_status(:ok)
+    end
+  end
+
+  context "resource hrefs" do
+    it "returns the requests href reference for objects of different subclasses" do
+      provision_request = FactoryGirl.create(:service_template_provision_request, :requester => @user)
+      automation_request = FactoryGirl.create(:automation_request, :requester => @user)
+      api_basic_authorize collection_action_identifier(:requests, :read, :get)
+
+      run_get requests_url, :expand => :resources
+
+      expected = [
+        a_hash_including('href' => a_string_including(requests_url(provision_request.id))),
+        a_hash_including('href' => a_string_including(requests_url(automation_request.id)))
+      ]
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body['resources']).to match_array(expected)
     end
   end
 end

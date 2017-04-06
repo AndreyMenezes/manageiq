@@ -13,15 +13,11 @@ class ManageIQ::Providers::Openshift::ContainerManager < ManageIQ::Providers::Co
   end
 
   def self.description
-    @description ||= "OpenShift Origin".freeze
+    @description ||= "OpenShift".freeze
   end
 
   def self.event_monitor_class
     ManageIQ::Providers::Openshift::ContainerManager::EventCatcher
-  end
-
-  def supported_auth_attributes
-    %w(userid password auth_key)
   end
 
   def create_project(project)

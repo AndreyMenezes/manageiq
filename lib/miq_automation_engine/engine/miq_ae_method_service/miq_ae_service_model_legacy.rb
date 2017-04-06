@@ -3,15 +3,15 @@ module MiqAeMethodService
     # Alias model names do not create deprecation warnings
     ALIAS_MODEL_NAMES = {
       'ems' => 'ExtManagementSystem'
-    }
+    }.freeze
 
     # Legacy model names create deprecation warnings
     LEGACY_MODEL_NAMES = {
       # Amazon
       'auth_key_pair_amazon'                         => 'ManageIQ_Providers_Amazon_CloudManager_AuthKeyPair',
       'availability_zone_amazon'                     => 'ManageIQ_Providers_Amazon_CloudManager_AvailabilityZone',
-      'cloud_volume_amazon'                          => 'ManageIQ_Providers_Amazon_CloudManager_CloudVolume',
-      'cloud_volume_snapshot_amazon'                 => 'ManageIQ_Providers_Amazon_CloudManager_CloudVolumeSnapshot',
+      'cloud_volume_amazon'                          => 'ManageIQ_Providers_Amazon_StorageManager_Ebs_CloudVolume',
+      'cloud_volume_snapshot_amazon'                 => 'ManageIQ_Providers_Amazon_StorageManager_Ebs_CloudVolumeSnapshot',
       'flavor_amazon'                                => 'ManageIQ_Providers_Amazon_CloudManager_Flavor',
       'floating_ip_amazon'                           => 'ManageIQ_Providers_Amazon_NetworkManager_FloatingIp',
       'orchestration_stack_amazon'                   => 'ManageIQ_Providers_Amazon_CloudManager_OrchestrationStack',
@@ -82,7 +82,7 @@ module MiqAeMethodService
       # Others
       'configuration_manager'                        => 'ManageIQ_Providers_ConfigurationManager',
       'provisioning_manager'                         => 'ManageIQ_Providers_ProvisioningManager'
-    }
+    }.freeze
 
     def service_model_lookup(model_name)
       converted_name = model_name.to_s.underscore
