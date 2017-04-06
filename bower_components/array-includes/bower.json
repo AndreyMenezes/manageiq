@@ -1,0 +1,22 @@
+{
+  "name": "array-includes",
+  "version": "0.1.0",
+  "authors": [
+    "Adam Moore <adam@dialexa.com>"
+  ],
+  "description": "Adds includes to the array prototype",
+  "main": "array-includes.js",
+  "keywords": [
+    "array",
+    "includes",
+    "prototype"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}

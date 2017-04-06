@@ -1,0 +1,24 @@
+{
+  "name": "spice-html5-bower",
+  "homepage": "http://www.spice-space.org",
+  "authors": [
+    "Martin Hradil <mhradil@redhat.com>",
+    "Amos Benari <abenari@redhat.com>"
+  ],
+  "description": "Spice HTML5 client packed for bower",
+  "main": "spice-html5-rails.js",
+  "moduleType": [
+    "globals"
+  ],
+  "license": "LGPL",
+  "version": "1.6.3",
+  "_release": "1.6.3",
+  "_resolution": {
+    "type": "version",
+    "tag": "v1.6.3",
+    "commit": "ef9814972cc1777a65b22927d4d24710e7298b16"
+  },
+  "_source": "https://github.com/himdel/spice-html5-bower.git",
+  "_target": "~1.6.3",
+  "_originalSource": "himdel/spice-html5-bower"
+}

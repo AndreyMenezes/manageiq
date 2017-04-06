@@ -1,0 +1,33 @@
+{
+  "name": "manageiq-ui-components",
+  "description": "UI components for ManageIQ project",
+  "main": [
+    "dist/css/ui-components.css",
+    "dist/js/ui-components.js",
+    "dist/js/ui-components.js.map"
+  ],
+  "authors": [
+    ""
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/ManageIQ/ui-components",
+  "moduleType": [],
+  "ignore": [
+    "*",
+    "!dist/",
+    "!dist/*",
+    "!LICENSE",
+    "!README.adoc"
+  ],
+  "dependencies": {},
+  "devDependencies": {},
+  "_release": "0a794d4f77",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "0a794d4f77381ffe2e1195411b52907d2b048e35"
+  },
+  "_source": "https://github.com/ManageIQ/ui-components.git",
+  "_target": "master",
+  "_originalSource": "manageiq-ui-components"
+}

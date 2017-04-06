@@ -1,0 +1,47 @@
+{
+  "name": "kubernetes-topology-graph",
+  "version": "0.0.23",
+  "description": "Provides a simple force directed topology graph of kubernetes items.",
+  "moduleType": [
+    "globals"
+  ],
+  "keywords": [
+    "kubernetes",
+    "angularjs"
+  ],
+  "authors": [
+    "Stef Walter <stefw@redhat.com>"
+  ],
+  "ignore": [
+    "**/.*",
+    "Gruntfile.js",
+    "*.html",
+    "package.json",
+    "/topology-graph.*",
+    "node_modules",
+    "bower_components",
+    "scratch"
+  ],
+  "main": [
+    "dist/topology-graph.js",
+    "dist/topology-graph.css"
+  ],
+  "dependencies": {
+    "angular": ">=1.3.8 <1.6",
+    "d3": ">=3.5.0 <=3.5.5"
+  },
+  "devDependencies": {
+    "patternfly": ">=2.9.0",
+    "font-awesome": "*"
+  },
+  "homepage": "https://github.com/kubernetes-ui/topology-graph",
+  "_release": "0.0.23",
+  "_resolution": {
+    "type": "version",
+    "tag": "0.0.23",
+    "commit": "3751ae5dbaf26407fb93fc6a4c9bc97310886daa"
+  },
+  "_source": "https://github.com/kubernetes-ui/topology-graph.git",
+  "_target": "~0.0.23",
+  "_originalSource": "kubernetes-topology-graph"
+}

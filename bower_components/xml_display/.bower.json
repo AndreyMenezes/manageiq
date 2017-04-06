@@ -1,0 +1,37 @@
+{
+  "name": "xml_display",
+  "version": "0.1.1",
+  "homepage": "https://github.com/himdel/xml_display",
+  "authors": [
+    "Lev Muchnik <LevMuchnik@gmail.com>",
+    "Martin Hradil <himdel@seznam.cz>"
+  ],
+  "description": "A JS component to pretty-display XML data, with collapsible nodes.",
+  "main": [
+    "XMLDisplay.js",
+    "XMLDisplay.css"
+  ],
+  "keywords": [
+    "xml",
+    "collapse",
+    "display",
+    "jquery"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "_release": "0.1.1",
+  "_resolution": {
+    "type": "version",
+    "tag": "0.1.1",
+    "commit": "ed5fb8e5dc10f4d66e05c6c27a50defff14672e4"
+  },
+  "_source": "https://github.com/himdel/xml_display.git",
+  "_target": "~0.1.1",
+  "_originalSource": "xml_display"
+}
