@@ -83,13 +83,22 @@ module Api
       def normalize_url(value)
         svalue = value.to_s
         pref   = @req.api_prefix
-        svalue.match(pref) ? svalue : "#{pref}/#{svalue}"
+        suffix = @req.api_suffix
+        svalue.match(pref) ? svalue : "#{pref}/#{svalue}#{suffix}"
       end
 
       #
       # Let's normalize an href based on type and id value
       #
       def normalize_href(type, value)
+        type.to_s == @req.subcollection ? subcollection_href(type, value) : collection_href(type, value)
+      end
+
+      def subcollection_href(type, value)
+        normalize_url("#{@req.collection}/#{@req.c_id}/#{type}/#{value}")
+      end
+
+      def collection_href(type, value)
         normalize_url("#{type}/#{value}")
       end
 

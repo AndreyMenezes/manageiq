@@ -2,6 +2,7 @@ class ContainerProject < ApplicationRecord
   include SupportsFeatureMixin
   include CustomAttributeMixin
   include ArchivedMixin
+  include_concern 'Purging'
   belongs_to :ext_management_system, :foreign_key => "ems_id"
   has_many :container_groups
   has_many :container_routes
@@ -60,6 +61,7 @@ class ContainerProject < ApplicationRecord
   end
 
   def disconnect_inv
+    return if ems_id.nil?
     _log.info "Disconnecting Container Project [#{name}] id [#{id}] from EMS [#{ext_management_system.name}]" \
     "id [#{ext_management_system.id}] "
     self.old_ems_id = ems_id

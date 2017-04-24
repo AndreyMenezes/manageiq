@@ -42,13 +42,14 @@ class ServiceAnsiblePlaybook < ServiceGeneric
   end
 
   def postprocess(action)
-    hosts = options.fetch_path(job_option_key(action), :inventory)
-    delete_inventory(action) unless use_default_inventory?(hosts)
+    inventory_raw_id = options.fetch_path(job_option_key(action), :inventory)
+    delete_inventory(action, inventory_raw_id) if inventory_raw_id
   end
 
   def on_error(action)
     _log.info("on_error called for service action: #{action}")
     update_attributes(:retirement_state => 'error') if action == "Retirement"
+    job(action).try(:refresh_ems)
     postprocess(action)
   end
 
@@ -73,7 +74,7 @@ class ServiceAnsiblePlaybook < ServiceGeneric
   end
 
   def save_job_options(action, overrides)
-    job_options = options.fetch_path(:config_info, action.downcase.to_sym).slice(:hosts, :extra_vars)
+    job_options = options.fetch_path(:config_info, action.downcase.to_sym).slice(:hosts, :extra_vars).with_indifferent_access
     job_options.deep_merge!(parse_dialog_options) unless action == ResourceAction::RETIREMENT
     job_options.deep_merge!(overrides)
 
@@ -122,10 +123,9 @@ class ServiceAnsiblePlaybook < ServiceGeneric
     end
   end
 
-  def delete_inventory(action)
+  def delete_inventory(action, inventory_raw_id)
     manager(action).with_provider_connection do |connection|
-      inventory_id = options.fetch_path(job_option_key(action), :inventory)
-      connection.api.inventories.find(inventory_id).destroy!
+      connection.api.inventories.find(inventory_raw_id).destroy!
     end
   end
 

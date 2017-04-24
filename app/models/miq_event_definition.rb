@@ -117,12 +117,12 @@ class MiqEventDefinition < ApplicationRecord
   end
 
   def self.seed
-    MiqEventDefinitionSet.seed
     seed_default_events
     seed_default_definitions
   end
 
   def self.seed_default_events
+    event_sets = MiqEventDefinitionSet.all.index_by(&:name)
     fname = File.join(FIXTURE_DIR, "#{to_s.pluralize.underscore}.csv")
     CSV.foreach(fname, :headers => true, :skip_lines => /^#/, :skip_blanks => true) do |csv_row|
       event = csv_row.to_hash
@@ -140,7 +140,7 @@ class MiqEventDefinition < ApplicationRecord
         end
       end
 
-      es = MiqEventDefinitionSet.find_by(:name => set_type)
+      es = event_sets[set_type]
       rec.memberof.each { |old_set| rec.make_not_memberof(old_set) unless old_set == es } # handle changes in set membership
       es.add_member(rec) if es && !es.members.include?(rec)
     end

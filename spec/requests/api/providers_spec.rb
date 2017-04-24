@@ -318,6 +318,37 @@ describe "Providers API" do
         expect(provider.send(item)).to eq(sample_foreman[item])
       end
     end
+
+    it 'returns the correct href reference on the collection' do
+      provider = FactoryGirl.create(:provider_foreman)
+      api_basic_authorize collection_action_identifier(:providers, :read, :get)
+
+      run_get providers_url, :provider_class => 'provider'
+
+      expected = {
+        'resources' => [{'href' => a_string_including("/api/providers/#{provider.id}?provider_class=provider")}],
+        'actions'   => [a_hash_including('href' => a_string_including('?provider_class=provider'))]
+      }
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include(expected)
+    end
+
+    it 'returns the correct href reference on a resource' do
+      provider = FactoryGirl.create(:provider_foreman)
+      api_basic_authorize action_identifier(:providers, :read, :resource_actions, :get),
+                          action_identifier(:providers, :edit)
+
+      run_get providers_url(provider.id), :provider_class => :provider
+
+      expected = {
+        'href'    => a_string_including("/api/providers/#{provider.id}?provider_class=provider"),
+        'actions' => [
+          a_hash_including('href' => a_string_including("/api/providers/#{provider.id}?provider_class=provider"))
+        ]
+      }
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include(expected)
+    end
   end
 
   describe "Providers create" do
@@ -774,6 +805,29 @@ describe "Providers API" do
                                   :href    => providers_url(provider.id),
                                   :task    => true)
     end
+
+    it "provider refresh for provider_class=provider are created with multiple tasks for multi-manager providers" do
+      api_basic_authorize collection_action_identifier(:providers, :refresh)
+
+      provider = FactoryGirl.create(:provider_foreman, :zone => @zone, :url => "example.com", :verify_ssl => false)
+      provider.update_authentication(:default => default_credentials.symbolize_keys)
+      provider.authentication_type(:default).update(:status => "Valid")
+
+      run_post(providers_url(provider.id) + '?provider_class=provider', gen_request(:refresh))
+
+      expected = {
+        "success"   => true,
+        "message"   => a_string_matching("Provider .* refreshing"),
+        "href"      => a_string_matching(providers_url(provider.id)),
+        "task_id"   => a_kind_of(Numeric),
+        "task_href" => a_string_matching(tasks_url),
+        "tasks"     => [a_hash_including("id" => a_kind_of(Numeric), "href" => a_string_matching(tasks_url)),
+                        a_hash_including("id" => a_kind_of(Numeric), "href" => a_string_matching(tasks_url))]
+      }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include(expected)
+    end
   end
 
   describe 'Providers import VM' do
@@ -893,6 +947,53 @@ describe "Providers API" do
       api_basic_authorize
 
       run_get("#{providers_url(@provider.id)}/load_balancers/#{@load_balancer.id}")
+
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
+
+  context 'cloud tenants subcollection' do
+    before do
+      @provider = FactoryGirl.create(:ems_openstack)
+      @cloud_tenant = FactoryGirl.create(:cloud_tenant, :ext_management_system => @provider)
+    end
+
+    it 'queries all cloud tenants' do
+      api_basic_authorize subcollection_action_identifier(:providers, :cloud_tenants, :read, :get)
+
+      run_get("#{providers_url(@provider.id)}/cloud_tenants")
+
+      expected = {
+        'resources' => [
+          { 'href' => a_string_matching("#{providers_url(@provider.id)}/cloud_tenants/#{@cloud_tenant.id}") }
+        ]
+
+      }
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include(expected)
+    end
+
+    it "will not show a provider's cloud tenants without the appropriate role" do
+      api_basic_authorize
+
+      run_get("#{providers_url(@provider.id)}/cloud_tenants")
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it 'queries a single cloud tenant' do
+      api_basic_authorize action_identifier(:cloud_tenants, :read, :subresource_actions, :get)
+
+      run_get("#{providers_url(@provider.id)}/cloud_tenants/#{@cloud_tenant.id}")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include('id' => @cloud_tenant.id)
+    end
+
+    it "will not show a provider's cloud tenant without the appropriate role" do
+      api_basic_authorize
+
+      run_get("#{providers_url(@provider.id)}/cloud_tenants/#{@cloud_tenant.id}")
 
       expect(response).to have_http_status(:forbidden)
     end

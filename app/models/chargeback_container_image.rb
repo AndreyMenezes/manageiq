@@ -44,21 +44,25 @@ class ChargebackContainerImage < Chargeback
       @data_index.store_path(:container_image, :by_container_id, c.id, c.container_image)
     end
 
+    @unknown_project ||= OpenStruct.new(:id => 0, :name => _('Unknown Project'), :ems_ref => _('Unknown'))
+    @unknown_image ||= OpenStruct.new(:id => 0, :full_name => _('Unknown Image'))
     build_results_for_report_chargeback(options)
+  ensure
+    @data_index = @containers = nil
   end
 
   def self.default_key(metric_rollup_record, ts_key)
-    project = @data_index.fetch_path(:container_project, :by_container_id, metric_rollup_record.resource_id)
-    image = @data_index.fetch_path(:container_image, :by_container_id, metric_rollup_record.resource_id)
+    project = self.project(metric_rollup_record)
+    image = self.image(metric_rollup_record)
     @options[:groupby] == 'project' ? "#{project.id}_#{ts_key}" : "#{project.id}_#{image.id}_#{ts_key}"
   end
 
   def self.image(consumption)
-    @data_index.fetch_path(:container_image, :by_container_id, consumption.resource_id)
+    @data_index.fetch_path(:container_image, :by_container_id, consumption.resource_id) || @unknown_image
   end
 
   def self.project(consumption)
-    @data_index.fetch_path(:container_project, :by_container_id, consumption.resource_id)
+    @data_index.fetch_path(:container_project, :by_container_id, consumption.resource_id) || @unknown_project
   end
 
   def self.where_clause(records, _options)
@@ -89,8 +93,7 @@ class ChargebackContainerImage < Chargeback
 
   def init_extra_fields(consumption)
     self.project_name  = self.class.project(consumption).name
-    # until image archiving is implemented
-    self.image_name    = self.class.image(consumption).try(:full_name) || _('Deleted')
+    self.image_name    = self.class.image(consumption).try(:full_name)
     self.project_uid   = self.class.project(consumption).ems_ref
     self.provider_name = consumption.parent_ems.try(:name)
     self.provider_uid  = consumption.parent_ems.try(:guid)

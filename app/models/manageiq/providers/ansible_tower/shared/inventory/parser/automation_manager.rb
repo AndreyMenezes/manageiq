@@ -53,13 +53,14 @@ module ManageIQ::Providers::AnsibleTower::Shared::Inventory::Parser::AutomationM
       inventory_object.description = project.description
       inventory_object.name = project.name
       # checking project.credential due to https://github.com/ansible/ansible_tower_client_ruby/issues/68
-      inventory_object.authentication = persister.credentials.lazy_find(project.credential_id.to_s) if project.credential
+      inventory_object.authentication = persister.credentials.lazy_find(project.try(:credential_id).to_s)
       inventory_object.scm_type = project.scm_type
       inventory_object.scm_url = project.scm_url
       inventory_object.scm_branch = project.scm_branch
       inventory_object.scm_clean = project.scm_clean
       inventory_object.scm_delete_on_update = project.scm_delete_on_update
       inventory_object.scm_update_on_launch = project.scm_update_on_launch
+      inventory_object.status = project.status
 
       project.playbooks.each do |playbook_name|
         inventory_object_playbook = persister.configuration_script_payloads.find_or_build_by(

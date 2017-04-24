@@ -6,6 +6,7 @@ class ContainerGroup < ApplicationRecord
   include NewWithTypeStiMixin
   include TenantIdentityMixin
   include ArchivedMixin
+  include_concern 'Purging'
 
   # :name, :uid, :creation_timestamp, :resource_version, :namespace
   # :labels, :restart_policy, :dns_policy
@@ -80,6 +81,7 @@ class ContainerGroup < ApplicationRecord
   end
 
   def disconnect_inv
+    return if ems_id.nil?
     _log.info "Disconnecting Pod [#{name}] id [#{id}] from EMS [#{ext_management_system.name}]" \
     "id [#{ext_management_system.id}] "
     self.container_definitions.each(&:disconnect_inv)

@@ -3,7 +3,7 @@ module Api
     def edit_resource(type, id, data)
       auth = resource_search(id, type, collection_class(:authentications))
       raise "Update not supported for #{authentication_ident(auth)}" unless auth.respond_to?(:update_in_provider_queue)
-      task_id = auth.update_in_provider_queue(data)
+      task_id = auth.update_in_provider_queue(data.deep_symbolize_keys)
       action_result(true, "Updating #{authentication_ident(auth)}", :task_id => task_id)
     rescue => err
       action_result(false, err.to_s)
@@ -22,6 +22,14 @@ module Api
       raise "Delete not supported for #{authentication_ident(auth)}" unless auth.respond_to?(:delete_in_provider_queue)
       task_id = auth.delete_in_provider_queue
       action_result(true, "Deleting #{authentication_ident(auth)}", :task_id => task_id)
+    rescue => err
+      action_result(false, err.to_s)
+    end
+
+    def refresh_resource(type, id, _data)
+      auth = resource_search(id, type, collection_class(type))
+      task_ids = EmsRefresh.queue_refresh_task(auth)
+      action_result(true, "Refreshing #{authentication_ident(auth)}", :task_ids => task_ids)
     rescue => err
       action_result(false, err.to_s)
     end

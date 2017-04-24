@@ -2,6 +2,7 @@ class Container < ApplicationRecord
   include SupportsFeatureMixin
   include NewWithTypeStiMixin
   include ArchivedMixin
+  include_concern 'Purging'
 
   has_one    :container_group, :through => :container_definition
   belongs_to :ext_management_system, :foreign_key => :ems_id
@@ -43,6 +44,7 @@ class Container < ApplicationRecord
   end
 
   def disconnect_inv
+    return if ems_id.nil?
     _log.info "Disconnecting Container [#{name}] id [#{id}] from EMS "
     self.deleted_on = Time.now.utc
     self.old_ems_id = self.ems_id

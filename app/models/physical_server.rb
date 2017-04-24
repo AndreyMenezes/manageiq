@@ -1,5 +1,6 @@
 class PhysicalServer < ApplicationRecord
   include NewWithTypeStiMixin
+  include MiqPolicyMixin
 
   acts_as_miq_taggable
   belongs_to :ext_management_system, :foreign_key => :ems_id, :class_name => "ManageIQ::Providers::PhysicalInfraManager"
@@ -9,34 +10,25 @@ class PhysicalServer < ApplicationRecord
 
   has_one :host, :inverse_of => :physical_server
 
+  VENDOR_TYPES = {
+    # DB        Displayed
+    "lenovo"  => "lenovo",
+    "unknown" => "Unknown",
+    nil       => "Unknown",
+  }.freeze
+
   def name_with_details
     details % {
       :name => name,
     }
   end
 
-
-  def is_refreshable?
-    refreshable_status[:show]
+  def has_compliance_policies?
+    _, plist = MiqPolicy.get_policies_for_target(self, "compliance", "physicalserver_compliance_check")
+    !plist.blank?
   end
 
-  def is_refreshable_now?
-    refreshable_status[:enabled]
+  def label_for_vendor
+    VENDOR_TYPES[vendor]
   end
-
-  def is_refreshable_now_error_message
-    refreshable_status[:message]
-  end
-
-  def is_available?(address)
-    #TODO (walteraa) remove bypass
-    true
-  end
-
-  def smart?
-    #TODO (walteraa) remove bypass
-    true
-  end
-
-
 end

@@ -4,7 +4,8 @@ class ContainerImage < ApplicationRecord
   include ScanningMixin
   include TenantIdentityMixin
   include CustomAttributeMixin
-
+  include ArchivedMixin
+  include_concern 'Purging'
 
   DOCKER_IMAGE_PREFIX = "docker://"
   DOCKER_PULLABLE_PREFIX = "docker-pullable://".freeze
@@ -26,9 +27,6 @@ class ContainerImage < ApplicationRecord
 
   serialize :exposed_ports, Hash
   serialize :environment_variables, Hash
-
-  # Needed for scanning & tagging action
-  delegate :my_zone, :to => :ext_management_system
 
   acts_as_miq_taggable
   virtual_column :display_registry, :type => :string
@@ -104,6 +102,7 @@ class ContainerImage < ApplicationRecord
   end
 
   def disconnect_inv
+    return if ems_id.nil?
     _log.info "Disconnecting Image [#{name}] id [#{id}] from EMS [#{ext_management_system.name}]" \
     "id [#{ext_management_system.id}] "
     self.container_image_registry = nil
