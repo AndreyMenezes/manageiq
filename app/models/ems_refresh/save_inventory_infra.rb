@@ -173,15 +173,7 @@ module EmsRefresh::SaveInventoryInfra
           found.update_attributes(h)
         end
 
-        # Handle duplicate names coming in because of duplicate hostnames.
-        begin
-          found.save!
-        rescue ActiveRecord::RecordInvalid
-          raise if found.errors[:name].blank?
-          old_name = Host.where("name LIKE ?", "#{found.name.sub(/ - \d+$/, "")}%").order("LENGTH(name) DESC").order("name DESC").first.name
-          found.name = old_name =~ / - \d+$/ ? old_name.succ : "#{old_name} - 2"
-          retry
-        end
+        found.save!
 
         disconnects.delete(found)
 
@@ -347,7 +339,14 @@ module EmsRefresh::SaveInventoryInfra
   end
 
   def save_lans_inventory(switch, hashes)
-    save_inventory_multi(switch.lans, hashes, :use_association, [:uid_ems])
+    extra_keys = [:parent]
+    child_keys = [:subnets]
+
+    save_inventory_multi(switch.lans, hashes, :use_association, [:uid_ems], child_keys, extra_keys)
+  end
+
+  def save_subnets_inventory(lan, hashes)
+    save_inventory_multi(lan.subnets, hashes, :use_association, [:ems_ref])
   end
 
   def save_storage_files_inventory(storage, hashes)

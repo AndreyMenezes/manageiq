@@ -1,6 +1,8 @@
 class MiqAlert < ApplicationRecord
   include UuidMixin
 
+  SEVERITIES = [nil, "info", "warning", "error"]
+
   serialize :miq_expression
   serialize :hash_expression
   serialize :options
@@ -9,6 +11,7 @@ class MiqAlert < ApplicationRecord
   validates_uniqueness_of   :description, :guid
   validate :validate_automate_expressions
   validate :validate_single_expression
+  validates :severity, :inclusion => { :in => SEVERITIES }
 
   has_many :miq_alert_statuses, :dependent => :destroy
   before_save :set_responds_to_events
@@ -235,12 +238,13 @@ class MiqAlert < ApplicationRecord
   end
 
   def add_status_post_evaluate(target, result, event)
-    status_description, severity, url, ems_ref, resolved = event.try(:parse_event_metadata)
+    status_description, event_severity, url, ems_ref, resolved = event.try(:parse_event_metadata)
     status = miq_alert_statuses.find_or_initialize_by(:resource => target, :event_ems_ref => ems_ref)
     status.result = result
     status.ems_id = target.try(:ems_id)
     status.description = status_description || description
-    status.severity = severity unless severity.blank?
+    status.severity = severity
+    status.severity = event_severity unless event_severity.blank?
     status.url = url unless url.blank?
     status.event_ems_ref = ems_ref unless ems_ref.blank?
     status.resolved = resolved
@@ -476,6 +480,106 @@ class MiqAlert < ApplicationRecord
         :options => [
           {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<=", "="]},
           {:name => :value_mw_garbage_collector, :description => _("Duration Per Minute (ms)"), :numeric => true}
+        ]},
+      {:name => "mw_ds_available_count", :description => _("DataSource - Connections Available"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of available Datasource connections"), :numeric => true}
+        ]},
+      {:name => "mw_ds_in_use_count", :description => _("DataSource - Connections In Use"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Datasource connections in use"), :numeric => true}
+        ]},
+      {:name => "mw_ds_timed_out", :description => _("DataSource - Connections Time Out"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Time Out Datasource connections"), :numeric => true}
+        ]},
+      {:name => "mw_ds_average_get_time", :description => _("DataSource - Connection Get Time"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Average Get Time in Datasource connection (ms)"), :numeric => true}
+        ]},
+      {:name => "mw_ds_average_creation_time", :description => _("DataSource - Connection Creation Time"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Average Creation Time in Datasource connection (ms)"), :numeric => true}
+        ]},
+      {:name => "mw_ds_max_wait_time", :description => _("DataSource - Connection Wait Time"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Max Wait Time in Datasource connection (ms)"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_delivering_count", :description => _("Messaging - Delivering Message Count"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Delivering Message Count"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_durable_message_count", :description => _("Messaging - Durable Message Count"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Durable Message Count"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_non_durable_message_count", :description => _("Messaging - Non-durable Message Count"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Non-durable Message Count"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_message_count", :description => _("Messaging - Messages Count"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Messages Count"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_message_added", :description => _("Messaging - Messages Added"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Messages Added"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_durable_subscription_count", :description => _("Messaging - Durable Subscribers"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Durable Subscribers"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_non_durable_subscription_count", :description => _("Messaging - Non-durable Subscribers"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Non-durable Subscribers"), :numeric => true}
+        ]},
+      {:name => "mw_ms_topic_subscription_count", :description => _("Messaging - Subscriptions"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Subscriptions"), :numeric => true}
+        ]},
+      {:name => "mw_tx_committed", :description => _("EAP Transactions - Committed"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Comitted Transactions"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_tx_timeout", :description => _("EAP Transactions - Timed Out"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Timed Out Transactions"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_tx_heuristics", :description => _("EAP Transactions - Heuristic"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Heuristics"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_tx_application_rollbacks", :description => _("EAP Transactions - Application Rollbacks"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Application Rollbacks"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_tx_resource_rollbacks", :description => _("EAP Transactions - Resource Rollbacks"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Resource Rollbacks"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_tx_aborted", :description => _("EAP Transactions - Aborted"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of Aborted Transactions"), :numeric => true, :required => true}
         ]},
       {:name => "dwh_generic", :description => _("All Datawarehouse alerts"), :db => ["ContainerNode"], :responds_to_events => "datawarehouse_alert",
         :options => [], :always_evaluate => true}

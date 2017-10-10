@@ -33,7 +33,6 @@ class Host < ApplicationRecord
   }.freeze
 
   validates_presence_of     :name
-  validates_uniqueness_of   :name
   validates_inclusion_of    :user_assigned_os, :in => ["linux_generic", "windows_generic", nil]
   validates_inclusion_of    :vmm_vendor, :in => VENDOR_TYPES.keys
 
@@ -49,6 +48,7 @@ class Host < ApplicationRecord
   has_many                  :host_switches, :dependent => :destroy
   has_many                  :switches, :through => :host_switches
   has_many                  :lans,     :through => :switches
+  has_many                  :subnets,  :through => :lans
   has_many                  :networks, :through => :hardware
   has_many                  :patches, :dependent => :destroy
   has_many                  :system_services, :dependent => :destroy
