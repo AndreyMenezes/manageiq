@@ -25,6 +25,7 @@ gem "activerecord-id_regions",        "~>0.2.0"
 gem "activerecord-session_store",     "~>1.1"
 gem "acts_as_tree",                   "~>2.7" # acts_as_tree needs to be required so that it loads before ancestry
 gem "ancestry",                       "~>2.2.1",       :require => false
+gem "bcrypt",                         "~> 3.1.10",     :require => false
 gem "bundler",                        ">=1.11.1",      :require => false
 gem "color",                          "~>1.8"
 gem "config",                         "~>1.3.0",       :require => false
@@ -35,10 +36,13 @@ gem "fast_gettext",                   "~>1.2.0"
 gem "gettext_i18n_rails",             "~>1.7.2"
 gem "gettext_i18n_rails_js",          "~>1.1.0"
 gem "hamlit",                         "~>2.7.0"
+gem "highline",                       "~>1.6.21",      :require => false
 gem "inifile",                        "~>3.0",         :require => false
 gem "kubeclient",                     "~>2.4.0",       :require => false # For scaling pods at runtime
 gem "manageiq-api-client",            "~>0.1.0",       :require => false
+gem "manageiq-messaging",                              :require => false, :git => "https://github.com/ManageIQ/manageiq-messaging", :branch => "master"
 gem "manageiq-network_discovery",     "~>0.1.2",       :require => false
+gem "memoist",                        "~>0.15.0",      :require => false
 gem "mime-types",                     "~>2.6.1",       :path => "mime-types-redirector"
 gem "more_core_extensions",           "~>3.3"
 gem "nakayoshi_fork",                 "~>0.0.3"  # provides a more CoW friendly fork (GC a few times before fork)
@@ -46,6 +50,8 @@ gem "net-ldap",                       "~>0.14.0",      :require => false
 gem "net-ping",                       "~>1.7.4",       :require => false
 gem "net-ssh",                        "=3.2.0",        :require => false
 gem "openscap",                       "~>0.4.3",       :require => false
+gem "pg",                             "~>0.18.2",      :require => false
+gem "pg-dsn_parser",                  "~>0.1.0",       :require => false
 gem "query_relation",                 "~>0.1.0",       :require => false
 gem "rails",                          "~>5.0.2"
 gem "rails-i18n",                     "~>5.x"
@@ -57,9 +63,9 @@ gem "rubyzip",                        "~>1.2.1",       :require => false
 gem "rugged",                         "~>0.25.0",      :require => false
 gem "simple-rss",                     "~>1.3.1",       :require => false
 gem "snmp",                           "~>1.2.0",       :require => false
+gem "trollop",                        "~>2.0",         :require => false
 
 # Modified gems (forked on Github)
-gem "amazon_ssa_support",                          :require => false, :git => "https://github.com/ManageIQ/amazon_ssa_support.git", :branch => "master" # Temporary dependency to be moved to manageiq-providers-amazon when officially release
 gem "ruport",                         "=1.7.0",                       :git => "https://github.com/ManageIQ/ruport.git", :tag => "v1.7.0-3"
 
 # In 1.9.3: Time.parse uses british version dd/mm/yyyy instead of american version mm/dd/yyyy
@@ -74,6 +80,7 @@ gem "american_date"
 ### providers
 group :amazon, :manageiq_default do
   manageiq_plugin "manageiq-providers-amazon"
+  gem "amazon_ssa_support",                          :require => false, :git => "https://github.com/ManageIQ/amazon_ssa_support.git", :branch => "master" # Temporary dependency to be moved to manageiq-providers-amazon when officially release
 end
 
 group :ansible, :manageiq_default do
@@ -109,6 +116,10 @@ group :nuage, :manageiq_default do
   manageiq_plugin "manageiq-providers-nuage"
 end
 
+group :qpid_proton, :optional => true do
+  gem "qpid_proton",                    "~>0.18",        :git => "https://github.com/xlab-si/qpid_proton_gem", :require => false
+end
+
 group :openshift, :manageiq_default do
   manageiq_plugin "manageiq-providers-openshift"
   gem "htauth",                         "2.0.0",         :require => false # used by container deployment
@@ -120,7 +131,6 @@ end
 
 group :ovirt, :manageiq_default do
   manageiq_plugin "manageiq-providers-ovirt"
-  gem "ovirt-engine-sdk",               "~>4.1.4",       :require => false # Required by the oVirt provider
   gem "ovirt_metrics",                  "~>1.4.1",       :require => false
 end
 
@@ -149,7 +159,7 @@ group :automate, :seed, :manageiq_default do
 end
 
 group :replication, :manageiq_default do
-  gem "pg-pglogical",                   "~>1.1.0",       :require => false
+  gem "pg-pglogical",                   "~>2.0.0",       :require => false
 end
 
 group :rest_api, :manageiq_default do
@@ -165,7 +175,12 @@ group :seed, :manageiq_default do
 end
 
 group :smartstate, :manageiq_default do
-  gem "manageiq-smartstate",            "~>0.1.5",       :require => false
+  gem "manageiq-smartstate",            "~>0.2",       :require => false
+end
+
+group :consumption, :manageiq_default do
+  manageiq_plugin "manageiq-consumption"
+  gem 'hashdiff'
 end
 
 group :ui_dependencies do # Added to Bundler.require in config/application.rb

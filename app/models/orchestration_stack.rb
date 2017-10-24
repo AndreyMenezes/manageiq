@@ -43,6 +43,8 @@ class OrchestrationStack < ApplicationRecord
 
   virtual_column :stdout, :type => :string
 
+  scope :without_type, ->(type) { where.not(:type => type) }
+
   alias_method :orchestration_stack_parameters, :parameters
   alias_method :orchestration_stack_outputs,    :outputs
   alias_method :orchestration_stack_resources,  :resources
@@ -148,17 +150,17 @@ class OrchestrationStack < ApplicationRecord
     manager = ExtManagementSystem.find_by(:id => manager_id)
 
     unless manager
-      raise _("No %{table} defined") % {:table => ui_lookup(:table => "ext_management_systems")}
+      raise _("No Provider defined")
     end
     unless manager.has_credentials?
-      raise _("No %{table} credentials defined") % {:table => ui_lookup(:table => "ext_management_systems")}
+      raise _("No Provider credentials defined")
     end
     unless manager.authentication_status_ok?
-      raise _("%{table} failed last authentication check") % {:table => ui_lookup(:table => "ext_management_systems")}
+      raise _("Provider failed last authentication check")
     end
 
     manager_settings = Settings.ems_refresh[manager.class.ems_type]
-    if manager_settings[:inventory_object_refresh] && manager_settings[:allow_targeted_refresh]
+    if manager_settings && manager_settings[:inventory_object_refresh] && manager_settings[:allow_targeted_refresh]
       # Queue new targeted refresh if allowed
       orchestration_stack_target = ManagerRefresh::Target.new(:manager     => manager,
                                                               :association => :orchestration_stacks,

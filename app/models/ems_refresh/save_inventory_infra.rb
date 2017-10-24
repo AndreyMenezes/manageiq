@@ -343,6 +343,15 @@ module EmsRefresh::SaveInventoryInfra
     child_keys = [:subnets]
 
     save_inventory_multi(switch.lans, hashes, :use_association, [:uid_ems], child_keys, extra_keys)
+    switch.save! # Needed to get ids back for lan new records
+
+    store_ids_for_new_records(switch.lans, hashes, :uid_ems)
+
+    child_lans = hashes.select { |h| !h[:id].nil? && !h.fetch_path(:parent, :id).nil? }
+    child_lans.each do |h|
+      parent_id = h.fetch_path(:parent, :id)
+      Lan.where(:id => h[:id]).update_all(:parent_id => parent_id)
+    end
   end
 
   def save_subnets_inventory(lan, hashes)

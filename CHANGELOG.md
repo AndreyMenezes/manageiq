@@ -5,6 +5,133 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 
 
+## Unreleased as of Sprint 71 ending 2017-10-16
+
+### Added
+- Alerts
+  - Add severity to alert definitions [(#16040)](https://github.com/ManageIQ/manageiq/pull/16040)
+- Chargeback
+  - Add Metering Used Hours to chargeback report [(#15908)](https://github.com/ManageIQ/manageiq/pull/15908)
+- Core
+  - Add PostgreSQL version restriction [(#16171)](https://github.com/ManageIQ/manageiq/pull/16171)
+  - Print file name on any error from RipperRubyParser not just SyntaxError [(#16112)](https://github.com/ManageIQ/manageiq/pull/16112)
+  - Added user_id group_id tenant_id [(#16089)](https://github.com/ManageIQ/manageiq/pull/16089)
+  - Enhance the the orchestrator to deal with more objects [(#15962)](https://github.com/ManageIQ/manageiq/pull/15962)
+- Providers
+  - Save the Lan parent_id for SCVMM [(#16165)](https://github.com/ManageIQ/manageiq/pull/16165)
+  - Directly run a playbook [(#16161)](https://github.com/ManageIQ/manageiq/pull/16161)
+  - Adding default filters configuration to physical servers [(#16158)](https://github.com/ManageIQ/manageiq/pull/16158)
+  - Add a Subnet model for SCVMM [(#16153)](https://github.com/ManageIQ/manageiq/pull/16153)
+  - Extend InventoryCollectionDefault::NetworkManager with network_groups [(#16136)](https://github.com/ManageIQ/manageiq/pull/16136)
+  - Enable alerts definitions for transactions and messaging for Middleware Server [(#16133)](https://github.com/ManageIQ/manageiq/pull/16133)
+  - Allow a 'type' setter on MiddlewareServer [(#16126)](https://github.com/ManageIQ/manageiq/pull/16126)
+  - Enable alerts definitions with datasource for Middleware Server [(#16125)](https://github.com/ManageIQ/manageiq/pull/16125)
+  - Enable alerts definitions using web sessions [(#16113)](https://github.com/ManageIQ/manageiq/pull/16113)
+  - Add policy buttons to physical server page [(#16110)](https://github.com/ManageIQ/manageiq/pull/16110) 
+  - Add ems_ref to filter duplicate events [(#16104)](https://github.com/ManageIQ/manageiq/pull/16104)
+  - Group by docker label in chargeback for container images [(#16097)](https://github.com/ManageIQ/manageiq/pull/16097)
+  - Add physical server to constant support policy [(#16085)](https://github.com/ManageIQ/manageiq/pull/16085)
+  - Adds support for physical server timeline [(#16084)](https://github.com/ManageIQ/manageiq/pull/16084)
+  - Add Service resource linking. [(#16082)](https://github.com/ManageIQ/manageiq/pull/16082)
+  - Always check for userid as UPN [(#16069)](https://github.com/ManageIQ/manageiq/pull/16069)
+  - Fixing middleware servers alert handling [(#16048)](https://github.com/ManageIQ/manageiq/pull/16048)
+  - Update model to use the customization_scripts table for LXCA config patterns [(#16036)](https://github.com/ManageIQ/manageiq/pull/16036)
+  - Parse the serial number during refresh [(#15992)](https://github.com/ManageIQ/manageiq/pull/15992)
+  - ovn: introducing ovn as ovirt's network provider [(#15929)](https://github.com/ManageIQ/manageiq/pull/15929)
+  - Add Report: Projects by Quota Items [(#15776)](https://github.com/ManageIQ/manageiq/pull/15776)
+- REST API
+  - Set current user for generic object methods [(#16120)](https://github.com/ManageIQ/manageiq/pull/16120)
+- RBAC
+  - Added SUI notifications product feature [(#16107)](https://github.com/ManageIQ/manageiq/pull/16107)
+- UI
+  - Add new classes to BUTTON_CLASSES [(#16181)](https://github.com/ManageIQ/manageiq/pull/16181)
+  - Override the href_slug method to use GUID instead of id [(#16129)](https://github.com/ManageIQ/manageiq/pull/16129)
+
+### Fixed
+- Core
+  - When importing report symbolize keys only in 'db_options:' section [(#16143)](https://github.com/ManageIQ/manageiq/pull/16143)
+  - Allow group settings with string keys [(#16142)](https://github.com/ManageIQ/manageiq/pull/16142)
+  - Add the help menu to the permissions template yaml file [(#16096)](https://github.com/ManageIQ/manageiq/pull/16096)
+  - Fix error importing Widget on Custom Report page [(#16034)](https://github.com/ManageIQ/manageiq/pull/16034)
+- Events
+  - Fix the ems_event add_queue method [(#16187)](https://github.com/ManageIQ/manageiq/pull/16187)
+- Providers
+  - Add MiqException prefix to vm snapshot exceptions [(#16186)](https://github.com/ManageIQ/manageiq/pull/16186)
+  - Changed Friendly_name to accept Arrays of queue_names [(#16172)](https://github.com/ManageIQ/manageiq/pull/16172)
+  - Remove duplicate metric_rollups not dealing with active relation [(#16166)](https://github.com/ManageIQ/manageiq/pull/16166)
+  - Fix Product Features [(#16164)](https://github.com/ManageIQ/manageiq/pull/16164)
+  - Fix attach/detach disks automate methods [(#16160)](https://github.com/ManageIQ/manageiq/pull/16160)
+  - Change Failure label by Rollback [(#16148)](https://github.com/ManageIQ/manageiq/pull/16148)
+- RBAC
+  - Ensure that `base_class` of first target is used for RBAC scope [(#16178)](https://github.com/ManageIQ/manageiq/pull/16178)
+  - Add belongsto filter for other network models [(#16151)](https://github.com/ManageIQ/manageiq/pull/16151)
+
+## Unreleased as of Sprint 70 ending 2017-10-02
+
+### Added
+- Authentication
+  - Added support for httpd auth-api service for containers. [(#15881)](https://github.com/ManageIQ/manageiq/pull/15881)
+- Automate
+  - Add the `picture` association to Generic Objects via `generic_object_definition` [(#16006)](https://github.com/ManageIQ/manageiq/pull/16006)
+  - Generic object add to service. [(#16000)](https://github.com/ManageIQ/manageiq/pull/16000)
+  - Rename the key from workspace to objects [(#15977)](https://github.com/ManageIQ/manageiq/pull/15977)
+- Core
+  - Add event streams product features [(#16021)](https://github.com/ManageIQ/manageiq/pull/16021)
+  - Use the built-in OpenShift service environment variables [(#16001)](https://github.com/ManageIQ/manageiq/pull/16001)
+- Events
+  - Add target to event existence check [(#15719)](https://github.com/ManageIQ/manageiq/pull/15719)
+- Performance
+  - Optimize speed and stabilize the batch graph refresh memory usage [(#15897)](https://github.com/ManageIQ/manageiq/pull/15897)
+- Providers
+  - Use more descriptive name for seal template [(#16045)](https://github.com/ManageIQ/manageiq/pull/16045)
+  - Enhance NetworkRouter model for Amazon [(#16030)](https://github.com/ManageIQ/manageiq/pull/16030)
+  - Metrics Worker capture_timer more ems centric [(#16004)](https://github.com/ManageIQ/manageiq/pull/16004)
+  - Support publish Vm by RHV [(#15981)](https://github.com/ManageIQ/manageiq/pull/15981)
+  - Improve metrics saving [(#15976)](https://github.com/ManageIQ/manageiq/pull/15976)
+  - Add OpenSCAP scan to supported features mixin [(#15944)](https://github.com/ManageIQ/manageiq/pull/15944)
+  - Queue targeted refresh in a provisioning workflow [(#15933)](https://github.com/ManageIQ/manageiq/pull/15933)
+  - Convert Container quotas to numeric values [(#15639)](https://github.com/ManageIQ/manageiq/pull/15639)
+- Provisioning
+  - Automate - VMware placement to support only Clusters or only Folders. [(#15951)](https://github.com/ManageIQ/manageiq/pull/15951)
+- Service UI
+  - Add SUI product features [(#16068)](https://github.com/ManageIQ/manageiq/pull/16068)
+  - Service dialog generation rely only on OrchestrationParameterConstraint [(#16047)](https://github.com/ManageIQ/manageiq/pull/16047)
+- User Interface
+  - Add dialog field description to list of values updatable by automate [(#16011)](https://github.com/ManageIQ/manageiq/pull/16011)
+  - Add virtual columns for GenericObject and GenericObjectDefinition [(#16007)](https://github.com/ManageIQ/manageiq/pull/16007)
+  - Expose Custom Button visability/enablement [(#15911)](https://github.com/ManageIQ/manageiq/pull/15911)
+
+### Fixed
+- Chargeback
+  - Delete tag assignments when deleting a tag that is referenced in an assignment [(#16039)](https://github.com/ManageIQ/manageiq/pull/16039)
+- Core
+  - Queue destroying of linked events when instance of MiqServer destroyed [(#15995)](https://github.com/ManageIQ/manageiq/pull/15995)
+  - Tool to replicate server settings to other servers [(#15990)](https://github.com/ManageIQ/manageiq/pull/15990)
+  - Ruby 2.4 - Replace all Fixnum|Bignum [(#15987)](https://github.com/ManageIQ/manageiq/pull/15987)
+  - Cancel before_destroy  callback chain for MiqServer by throwing 'abort' [(#15986)](https://github.com/ManageIQ/manageiq/pull/15986)
+- Providers
+  - Delegate name attribute to parent_manager [(#16067)](https://github.com/ManageIQ/manageiq/pull/16067)
+  - Fix for when target new refresh fails [(#16043)](https://github.com/ManageIQ/manageiq/pull/16043)
+  - Disabling batch saving for VmOrTemplate because of needed hooks [(#16031)](https://github.com/ManageIQ/manageiq/pull/16031)
+  - Fix the lenovo's event_catcher time [(#16012)](https://github.com/ManageIQ/manageiq/pull/16012)
+  - Change error notification level from success to error [(#15998)](https://github.com/ManageIQ/manageiq/pull/15998)
+  - Add nil checks for manager_uuids and references [(#15934)](https://github.com/ManageIQ/manageiq/pull/15934)
+  - Proxy support for cloning ansible repo and add provider [(#15762)](https://github.com/ManageIQ/manageiq/pull/15762)
+- RBAC
+  - Move rule for network manager to belonsto filter [(#16063)](https://github.com/ManageIQ/manageiq/pull/16063)
+  - Add Tasks start page URL to shortcuts yaml file [(#16061)](https://github.com/ManageIQ/manageiq/pull/16061)
+- Reporting
+  - Unconditionally seed all standard reports and widgets [(#16062)](https://github.com/ManageIQ/manageiq/pull/16062)
+  - Do not show container and cloud providers  on 'Monthly Hosts per Provider' report [(#15822)](https://github.com/ManageIQ/manageiq/pull/15822)
+- Smartstate
+  - Increase Timeouts and Worker Memory for Azure SSA [(#16016)](https://github.com/ManageIQ/manageiq/pull/16016)
+- User Interface
+  - Add monitoring menus [(#15866)](https://github.com/ManageIQ/manageiq/pull/15866)
+
+### Removed
+- Core
+  - Passing a class as a value in an Active Record query is deprecated [(#16008)](https://github.com/ManageIQ/manageiq/pull/16008)
+
 ## Unreleased as of Sprint 69 ending 2017-09-18
 
 ### Added

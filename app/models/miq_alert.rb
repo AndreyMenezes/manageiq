@@ -33,6 +33,10 @@ class MiqAlert < ApplicationRecord
     BASE_TABLES
   end
 
+  def self.display_name
+    "Alert"
+  end
+
   acts_as_miq_set_member
 
   ASSIGNMENT_PARENT_ASSOCIATIONS = [:host, :ems_cluster, :ext_management_system, :my_enterprise]
@@ -136,13 +140,18 @@ class MiqAlert < ApplicationRecord
     !assigned_to_target(target, "#{target.class.base_model.name.underscore}_perf_complete").empty?
   end
 
-  def self.evaluate_alerts(target, event, inputs = {})
+  def self.normalize_target(target)
     if target.kind_of?(Array)
       klass, id = target
       klass = Object.const_get(klass)
       target = klass.find_by(:id => id)
       raise "Unable to find object with class: [#{klass}], Id: [#{id}]" unless target
     end
+    target
+  end
+
+  def self.evaluate_alerts(target, event, inputs = {})
+    target = normalize_target(target)
 
     log_header = "[#{event}]"
     log_target = "Target: #{target.class.name} Name: [#{target.name}], Id: [#{target.id}]"
@@ -217,12 +226,7 @@ class MiqAlert < ApplicationRecord
   end
 
   def evaluate(target, inputs = {})
-    if target.kind_of?(Array)
-      klass, id = target
-      klass = Object.const_get(klass)
-      target = klass.find_by(:id => id)
-      raise "Unable to find object with class: [#{klass}], Id: [#{id}]" unless target
-    end
+    target = self.class.normalize_target(target)
 
     return if self.postpone_evaluation?(target)
 
@@ -580,6 +584,21 @@ class MiqAlert < ApplicationRecord
         :options => [
           {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
           {:name => :value_mw_threshold, :description => _("Number of Aborted Transactions"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_aggregated_active_web_sessions", :description => _("Web sessions - Active"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of active Web sessions"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_aggregated_expired_web_sessions", :description => _("Web sessions - Expired"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of expired Web sessions"), :numeric => true, :required => true}
+        ]},
+      {:name => "mw_aggregated_rejected_web_sessions", :description => _("Web sessions - Rejected"), :db => ["MiddlewareServer"], :responds_to_events => "hawkular_alert",
+        :options => [
+          {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
+          {:name => :value_mw_threshold, :description => _("Number of rejected Web sessions"), :numeric => true, :required => true}
         ]},
       {:name => "dwh_generic", :description => _("All Datawarehouse alerts"), :db => ["ContainerNode"], :responds_to_events => "datawarehouse_alert",
         :options => [], :always_evaluate => true}

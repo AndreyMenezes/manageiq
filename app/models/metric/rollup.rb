@@ -170,8 +170,10 @@ module Metric::Rollup
   ].freeze
   BURST_COLS = [
     :cpu_usage_rate_average,
+    :cpu_usagemhz_rate_average,
     :disk_usage_rate_average,
     :mem_usage_absolute_average,
+    :derived_memory_used,
     :net_usage_rate_average
   ]
   BURST_TYPES = ['min', 'max']
@@ -238,13 +240,14 @@ module Metric::Rollup
         new_perf_counts[col] ||= 0
 
         value = rt.send(col)
-
-        if obj.kind_of?(VmOrTemplate) && BURST_COLS.include?(col)
-          new_perf[:min_max] ||= {}
-          rollup_burst(col, new_perf[:min_max], rt.timestamp, value)
-        end
-
         Metric::Aggregation::Aggregate.column(col, nil, new_perf, new_perf_counts, value)
+      end
+
+      next unless obj.kind_of?(VmOrTemplate)
+      new_perf[:min_max] ||= {}
+      BURST_COLS.each do |col|
+        value = rt.send(col)
+        rollup_burst(col, new_perf[:min_max], rt.timestamp, value)
       end
     end
 

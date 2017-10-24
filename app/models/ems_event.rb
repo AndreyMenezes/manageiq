@@ -59,13 +59,22 @@ class EmsEvent < EventStream
   end
 
   def self.add_queue(meth, ems_id, event)
-    MiqQueue.submit_job(
-      :service     => "event",
-      :target_id   => ems_id,
-      :class_name  => "EmsEvent",
-      :method_name => meth,
-      :args        => [event],
-    )
+    if Settings.prototype.queue_type == 'artemis'
+      MiqQueue.artemis_client('event_handler').publish_topic(
+        :service => "events",
+        :sender  => ems_id,
+        :event   => event[:event_type],
+        :payload => event
+      )
+    else
+      MiqQueue.submit_job(
+        :service     => "event",
+        :target_id   => ems_id,
+        :class_name  => "EmsEvent",
+        :method_name => meth,
+        :args        => [event],
+      )
+    end
   end
 
   def self.add(ems_id, event_hash)

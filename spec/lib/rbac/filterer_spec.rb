@@ -211,13 +211,42 @@ describe Rbac::Filterer do
     end
 
     context 'when class does not participate in RBAC' do
+      before do
+        @vm = FactoryGirl.create(:vm_vmware, :name => "VM1", :host => @host1, :ext_management_system => @ems)
+        ["2010-04-14T20:52:30Z", "2010-04-14T21:51:10Z"].each do |t|
+          @vm.metric_rollups << FactoryGirl.create(:metric_rollup_vm_hr, :timestamp => t)
+        end
+      end
       let(:miq_ae_domain) { FactoryGirl.create(:miq_ae_domain) }
 
-      it 'returns same class as input' do
+      it 'returns the same class as input for MiqAeDomain' do
         User.with_user(admin_user) do
           results = described_class.search(:targets => [miq_ae_domain]).first
           expect(results.first).to be_an_instance_of(MiqAeDomain)
           expect(results).to match_array [miq_ae_domain]
+        end
+      end
+
+      it 'returns the same class as input for parent class that is not STI' do
+        User.with_user(admin_user) do
+          targets = @vm.metric_rollups
+
+          results = described_class.search(:targets => targets, :user => admin_user)
+          objects = results.first
+          expect(objects.length).to eq(2)
+          expect(objects).to match_array(targets)
+        end
+      end
+
+      it 'returns the same class as input for subclass that is not STI' do
+        User.with_user(admin_user) do
+          vm_perf = VmPerformance.find(@vm.metric_rollups.last.id)
+          targets = [vm_perf]
+
+          results = described_class.search(:targets => targets, :user => admin_user)
+          objects = results.first
+          expect(objects.length).to eq(1)
+          expect(objects).to match_array(targets)
         end
       end
     end
@@ -830,6 +859,18 @@ describe Rbac::Filterer do
             expect(objects).to eq(targets)
           end
 
+          it "returns the correct class for different classes of targets" do
+            @ems3 = FactoryGirl.create(:ems_vmware, :name => 'ems3')
+            @ems4 = FactoryGirl.create(:ems_microsoft, :name => 'ems4')
+
+            targets = [@ems2, @ems4, @ems3, @ems]
+
+            results = described_class.search(:targets => targets, :user => user)
+            objects = results.first
+            expect(objects.length).to eq(4)
+            expect(objects).to match_array(targets)
+          end
+
           it "finds both EMSes without belongsto filters" do
             results = described_class.search(:class => "ExtManagementSystem", :user => user)
             objects = results.first
@@ -1352,6 +1393,8 @@ describe Rbac::Filterer do
     end
 
     context "with tagged VMs" do
+      let(:ems) { FactoryGirl.create(:ext_management_system) }
+
       before(:each) do
         [
           FactoryGirl.create(:host, :name => "Host1", :hostname => "host1.local"),
@@ -1366,11 +1409,13 @@ describe Rbac::Filterer do
           vm.host = host
           vm.evm_owner_id = user.id  if i.even?
           vm.miq_group_id = group.id if i.odd?
+          vm.ext_management_system = ems if i.even?
           vm.save
           vm.tag_with(@tags.values.join(" "), :ns => "*") if i > 0
         end
 
-        Vm.scope :group_scope, ->(group_num) { Vm.where("name LIKE ?", "Test Group #{group_num}%") }
+        Vm.scope :group_scope,    ->(group_num) { Vm.where("name LIKE ?", "Test Group #{group_num}%") }
+        Vm.scope :is_on,          ->            { Vm.where(:power_state => "on") }
       end
 
       context ".search" do
@@ -1395,7 +1440,7 @@ describe Rbac::Filterer do
 
           it "works when passing a named_scope" do
             User.with_user(user) do
-              results = described_class.search(:class => "Vm", :named_scope => [:group_scope, 1]).first
+              results = described_class.search(:class => "Vm", :named_scope => [[:group_scope, 1]]).first
               expect(results.length).to eq(1)
             end
           end
@@ -1424,10 +1469,10 @@ describe Rbac::Filterer do
 
           it "works when passing a named_scope" do
             User.with_user(user) do
-              results = described_class.search(:class => "Vm", :named_scope => [:group_scope, 1]).first
+              results = described_class.search(:class => "Vm", :named_scope => [[:group_scope, 1]]).first
               expect(results.length).to eq(1)
 
-              results = described_class.search(:class => "Vm", :named_scope => [:group_scope, 2]).first
+              results = described_class.search(:class => "Vm", :named_scope => [[:group_scope, 2]]).first
               expect(results.length).to eq(0)
             end
           end
@@ -1450,7 +1495,22 @@ describe Rbac::Filterer do
         end
 
         it "works when passing a named_scope" do
-          results = described_class.search(:class => "Vm", :named_scope => [:group_scope, 4]).first
+          results = described_class.search(:class => "Vm", :named_scope => :is_on).first
+          expect(results.length).to eq(4)
+        end
+
+        it "works when passing a named_scope with parameterized scope" do
+          results = described_class.search(:class => "Vm", :named_scope => [[:group_scope, 4]]).first
+          expect(results.length).to eq(1)
+        end
+
+        it "works when passing a named_scope with multiple scopes" do
+          results = described_class.search(:class => "Vm", :named_scope => [:is_on, :active]).first
+          expect(results.length).to eq(2)
+        end
+
+        it "works when passing a named_scope with multiple mixed scopes" do
+          results = described_class.search(:class => "Vm", :named_scope => [[:group_scope, 3], :active]).first
           expect(results.length).to eq(1)
         end
 

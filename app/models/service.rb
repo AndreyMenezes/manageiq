@@ -68,6 +68,7 @@ class Service < ApplicationRecord
 
   include_concern 'RetirementManagement'
   include_concern 'Aggregation'
+  include_concern 'ResourceLinking'
 
   virtual_column :has_parent,                               :type => :boolean
   virtual_column :power_state,                              :type => :string
@@ -81,6 +82,9 @@ class Service < ApplicationRecord
 
   validates :display, :inclusion => { :in => [true, false] }
   validates :retired, :inclusion => { :in => [true, false] }
+
+  scope :displayed, ->              { where(:display => true) }
+  scope :retired,   ->(bool = true) { where(:retired => bool) }
 
   supports :reconfigure do
     unsupported_reason_add(:reconfigure, _("Reconfigure unsupported")) unless validate_reconfigure
