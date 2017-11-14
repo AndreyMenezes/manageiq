@@ -186,7 +186,6 @@ class EmsEvent < EventStream
       event_type == "datawarehouse_alert" ? message : nil,
       data[:severity],
       data[:url],
-      data[:ems_ref],
       data[:resolved],
     ]
   end
@@ -223,7 +222,7 @@ class EmsEvent < EventStream
     target_type = "src_vm_or_template"  if target_type == "src_vm"
     target_type = "dest_vm_or_template" if target_type == "dest_vm"
     target_type = "middleware_server"   if event.event_type == "hawkular_alert"
-    target_type = "container_node"      if event.event_type == "datawarehouse_alert"
+    target_type = "target"              if event.event_type == "datawarehouse_alert"
 
     event.send(target_type)
   end
@@ -246,8 +245,6 @@ class EmsEvent < EventStream
       :timestamp   => event[:timestamp],
       :chain_id    => event[:chain_id],
       :ems_id      => event[:ems_id],
-      :target_id   => event[:target_id],
-      :target_type => event[:target_type],
       :ems_ref     => event[:ems_ref],
     )
     new_event.handle_event if new_event

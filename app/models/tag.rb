@@ -53,7 +53,7 @@ class Tag < ApplicationRecord
 
   def self.parse(list)
     if list.kind_of?(Array)
-      tag_names = list.collect { |tag| tag.nil? ? nil : tag.to_s }
+      tag_names = list.collect { |tag| tag.try(:to_s) }
       return tag_names.compact
     else
       tag_names = []
@@ -62,7 +62,10 @@ class Tag < ApplicationRecord
       list = list.dup
 
       # first, pull out the quoted tags
-      list.gsub!(/\"(.*?)\"\s*/) { tag_names << $1; "" }
+      list.gsub!(/\"(.*?)\"\s*/) do
+        tag_names << $1
+        ""
+      end
 
       # then, replace all commas with a space
       list.tr!(',', " ")

@@ -40,7 +40,6 @@ class ServiceTemplate < ApplicationRecord
   include_concern 'Filter'
 
   belongs_to :tenant
-  belongs_to :blueprint
   # # These relationships are used to specify children spawned from a parent service
   # has_many   :child_services, :class_name => "ServiceTemplate", :foreign_key => :service_template_id
   # belongs_to :parent_service, :class_name => "ServiceTemplate", :foreign_key => :service_template_id
@@ -66,6 +65,7 @@ class ServiceTemplate < ApplicationRecord
   virtual_has_one :config_info, :class_name => "Hash"
 
   scope :with_service_template_catalog_id,          ->(cat_id) { where(:service_template_catalog_id => cat_id) }
+  scope :without_service_template_catalog_id,       ->         { where(:service_template_catalog_id => nil) }
   scope :with_existent_service_template_catalog_id, ->         { where.not(:service_template_catalog_id => nil) }
   scope :displayed,                                 ->         { where(:display => true) }
 
@@ -109,11 +109,6 @@ class ServiceTemplate < ApplicationRecord
       save!
     end
     reload
-  end
-
-  def readonly?
-    return true if super
-    blueprint.try(:published?)
   end
 
   def children

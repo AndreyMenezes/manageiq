@@ -1,6 +1,6 @@
 module MiqReport::Generator::Html
   def build_html_rows(clickable_rows = false)
-    tz = get_time_zone(Time.zone.name) if Time.zone
+    get_time_zone(Time.zone.name) if Time.zone
     html_rows = []
     group_counter = 0
     row = 0
@@ -166,7 +166,8 @@ module MiqReport::Generator::Html
     atoms = col_options.fetch_path(col, :style) unless col_options.nil?
     return if atoms.nil?
 
-    nh = {}; row.each { |k, v| nh[col_to_expression_col(k).sub(/-/, ".")] = v } # Convert keys to match expression fields
+    nh = {}
+    row.each { |k, v| nh[col_to_expression_col(k).sub(/-/, ".")] = v } # Convert keys to match expression fields
     field = col_to_expression_col(col)
 
     atoms.each do |atom|

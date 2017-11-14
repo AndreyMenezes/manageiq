@@ -19,6 +19,7 @@ class DialogImportService
 
     begin
       dialogs.each do |dialog|
+        dialog.except!(:blueprint_id, 'blueprint_id') # blueprint_id might appear in some old dialogs, but no longer exists
         if dialog_with_label?(dialog["label"])
           yield dialog if block_given?
         else
@@ -96,6 +97,18 @@ class DialogImportService
 
   private
 
+  def build_association_list(dialog)
+    associations = []
+    dialog["dialog_tabs"].flat_map do |tab|
+      tab["dialog_groups"].flat_map do |group|
+        group["dialog_fields"].flat_map do |field|
+          associations << { field["name"] => field["dialog_field_responders"] } unless field["dialog_field_responders"].nil?
+        end
+      end
+    end
+    associations
+  end
+
   def create_import_file_upload(file_contents)
     ImportFileUpload.create.tap do |import_file_upload|
       import_file_upload.store_binary_data_as_yml(file_contents, "Service dialog import")
@@ -104,17 +117,11 @@ class DialogImportService
 
   def import_from_dialogs(dialogs)
     raise ParsedNonDialogYamlError if dialogs.empty?
-    associations = []
     dialogs.each do |dialog|
-      dialog["dialog_tabs"].flat_map do |tab|
-        tab["dialog_groups"].flat_map do |group|
-          group["dialog_fields"].flat_map do |field|
-            associations << { field["name"] => field["dialog_field_responders"] } unless field["dialog_field_responders"].nil?
-          end
-        end
-      end
+      dialog.except!(:blueprint_id, 'blueprint_id') # blueprint_id might appear in some old dialogs, but no longer exists
       new_or_existing_dialog = Dialog.where(:label => dialog["label"]).first_or_create
       dialog['id'] = new_or_existing_dialog.id
+      associations_to_be_created = build_association_list(dialog)
       new_or_existing_dialog.update_attributes(
         dialog.merge(
           "dialog_tabs"      => build_dialog_tabs(dialog),
@@ -122,7 +129,7 @@ class DialogImportService
         )
       )
       fields = new_or_existing_dialog.dialog_fields
-      associations.each do |association|
+      associations_to_be_created.each do |association|
         association.values.each do |values|
           values.each do |responder|
             next if fields.select { |field| field.name == responder }.empty?

@@ -427,6 +427,7 @@ class VmOrTemplate < ApplicationRecord
 
   # override
   def self.invoke_task_local(task, vm, options, args)
+    user = User.current_user
     cb = nil
     if task
       cb =
@@ -447,25 +448,28 @@ class VmOrTemplate < ApplicationRecord
         end
     end
 
-    if options[:task] == "destroy"
-      MiqQueue.submit_job(
-        :class_name   => base_class.name,
-        :instance_id  => vm.id,
-        :method_name  => options[:task],
-        :args         => args,
-        :miq_callback => cb,
-      )
-    else
-      MiqQueue.submit_job(
-        :service      => options[:invoke_by] == :job ? "smartstate" : "ems_operations",
-        :affinity     => vm.ext_management_system,
-        :class_name   => base_class.name,
-        :instance_id  => vm.id,
-        :method_name  => options[:task],
-        :args         => args,
-        :miq_callback => cb,
-      )
-    end
+    q_hash =
+      if options[:task] == "destroy"
+        {
+          :class_name   => base_class.name,
+          :instance_id  => vm.id,
+          :method_name  => options[:task],
+          :args         => args,
+          :miq_callback => cb,
+        }
+      else
+        {
+          :service      => options[:invoke_by] == :job ? "smartstate" : "ems_operations",
+          :affinity     => vm.ext_management_system,
+          :class_name   => base_class.name,
+          :instance_id  => vm.id,
+          :method_name  => options[:task],
+          :args         => args,
+          :miq_callback => cb,
+        }
+      end
+    q_hash.merge!(:user_id => user.id, :group_id => user.current_group.id, :tenant_id => user.current_tenant.id) if user
+    MiqQueue.submit_job(q_hash)
   end
 
   def self.action_for_task(task)
@@ -540,7 +544,7 @@ class VmOrTemplate < ApplicationRecord
       rec.reason = []
       presult = vm.enforce_policy("rsop")
       if presult[:result] == false
-        presult[:details].each do|p|
+        presult[:details].each do |p|
           rec.reason.push(p["description"]) unless p["result"]
         end
         if rec.reason != []
@@ -607,7 +611,7 @@ class VmOrTemplate < ApplicationRecord
     _log.info("vm_hash [#{vm_hash.inspect}]")
     store = Storage.find_by(:name => vm_hash[:name])
     return nil unless store
-    vmobj = VmOrTemplate.find_by(:location => vm_hash[:location], :storage_id => store.id)
+    VmOrTemplate.find_by(:location => vm_hash[:location], :storage_id => store.id)
   end
 
   def self.repository_parse_path(path)
@@ -1596,9 +1600,7 @@ class VmOrTemplate < ApplicationRecord
   end
 
   def has_active_ems?
-    # If the VM does not have EMS connection see if it is using SmartProxy as the EMS
     return true unless ext_management_system.nil?
-    return true if host && host.acts_as_ems? && host.is_proxy_active?
     false
   end
 

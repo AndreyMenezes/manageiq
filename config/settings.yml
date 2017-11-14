@@ -797,6 +797,13 @@
     - MoveIntoResourcePool
     :VmSuspendedEvent:
     - SuspendVM_Task
+:help_menu:
+  :documentation:
+    :enabled: true
+  :product:
+    :enabled: true
+  :about:
+    :enabled: true
 :host_delete:
   :queue_timeout: 20.minutes
 :host_introspect:
@@ -896,6 +903,8 @@
   :host_overhead:
     :memory: 2.01.percent
     :cpu: 0.15.percent
+  :targets:
+    :archived_for: 8.hours
   :vim_cache_ttl: 1.hour
 :policy_events:
   :history:
@@ -1055,6 +1064,13 @@
       :starting_timeout: 20.minutes
       :poll: 10.seconds
       :memory_threshold: 0.megabytes
+    :agent_coordinator_worker:
+      :heartbeat_timeout: 30.minutes
+      :poll: 30.seconds
+    :ems_inventory_collector_worker:
+      :disabled: true
+      :nice_delta: 1
+      :poll: 5.seconds
     :ems_refresh_core_worker:
       :poll: 1.seconds
       :nice_delta: 1

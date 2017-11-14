@@ -4,6 +4,7 @@ class EmsCluster < ApplicationRecord
   include_concern 'CapacityPlanning'
   include EventMixin
   include TenantIdentityMixin
+  include CustomActionsMixin
 
   acts_as_miq_taggable
 
@@ -218,7 +219,7 @@ class EmsCluster < ApplicationRecord
 
   def get_reserve(field)
     rp = default_resource_pool
-    rp.nil? ? nil : rp.send(field)
+    rp && rp.send(field)
   end
 
   def cpu_reserve

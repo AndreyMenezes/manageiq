@@ -35,8 +35,6 @@ module Vmdb
       apply_config_value(config, $websocket_log,     :level_websocket)
     end
 
-    private
-
     def self.create_loggers
       path_dir = ManageIQ.root.join("log")
 
@@ -62,6 +60,7 @@ module Vmdb
 
       configure_external_loggers
     end
+    private_class_method :create_loggers
 
     def self.create_multicast_logger(log_file_path, logger_class = VMDBLogger)
       MulticastLogger.new(logger_class.new(log_file_path)).tap do |l|
@@ -73,6 +72,9 @@ module Vmdb
     def self.configure_external_loggers
       require 'awesome_spawn'
       AwesomeSpawn.logger = $log
+
+      require 'log_decorator'
+      LogDecorator.logger = $log
     end
     private_class_method :configure_external_loggers
 
@@ -86,6 +88,7 @@ module Vmdb
         logger.level = new_level
       end
     end
+    private_class_method :apply_config_value
   end
 end
 

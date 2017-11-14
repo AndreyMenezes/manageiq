@@ -242,10 +242,12 @@ class MiqAlert < ApplicationRecord
   end
 
   def add_status_post_evaluate(target, result, event)
-    status_description, event_severity, url, ems_ref, resolved = event.try(:parse_event_metadata)
+    status_description, event_severity, url, resolved = event.try(:parse_event_metadata)
+    ems_ref = event.try(:ems_ref)
     status = miq_alert_statuses.find_or_initialize_by(:resource => target, :event_ems_ref => ems_ref)
     status.result = result
     status.ems_id = target.try(:ems_id)
+    status.ems_id ||= target.id if target.is_a?(ExtManagementSystem)
     status.description = status_description || description
     status.severity = severity
     status.severity = event_severity unless event_severity.blank?
@@ -378,7 +380,10 @@ class MiqAlert < ApplicationRecord
 
   def self.operating_range_perf_model_details(dbs)
     dbs.inject({}) do |h, db|
-      h[db] = Metric::LongTermAverages::AVG_COLS.inject({}) { |hh, c| hh[c.to_s] = Dictionary.gettext("#{db}Performance.#{c}"); hh }
+      h[db] = Metric::LongTermAverages::AVG_COLS.inject({}) do |hh, c|
+        hh[c.to_s] = Dictionary.gettext("#{db}Performance.#{c}")
+        hh
+      end
       h
     end
   end
@@ -600,7 +605,7 @@ class MiqAlert < ApplicationRecord
           {:name => :mw_operator, :description => _("Operator"), :values => [">", ">=", "<", "<="]},
           {:name => :value_mw_threshold, :description => _("Number of rejected Web sessions"), :numeric => true, :required => true}
         ]},
-      {:name => "dwh_generic", :description => _("All Datawarehouse alerts"), :db => ["ContainerNode"], :responds_to_events => "datawarehouse_alert",
+      {:name => "dwh_generic", :description => _("External Prometheus Alerts"), :db => ["ContainerNode", "ExtManagementSystem"], :responds_to_events => "datawarehouse_alert",
         :options => [], :always_evaluate => true}
     ]
   end
@@ -678,7 +683,7 @@ class MiqAlert < ApplicationRecord
     return nil if miq_expression || hash_expression.nil? || hash_expression[:eval_method] == "nothing"
 
     options = self.class.expression_by_name(hash_expression[:eval_method])
-    options.nil? ? nil : substitute(options[:responds_to_events])
+    options && substitute(options[:responds_to_events])
   end
 
   def substitute(str)

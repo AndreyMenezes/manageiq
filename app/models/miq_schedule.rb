@@ -21,7 +21,11 @@ class MiqSchedule < ApplicationRecord
     where("updated_at > ?", time)
   }
 
-  scope :filter_matches_with, -> (exp) { where(:filter => exp) }
+  scope :filter_matches_with,      ->(exp)    { where(:filter => exp) }
+  scope :with_prod_default_not_in, ->(prod)   { where.not(:prod_default => prod).or(where(:prod_default => nil)) }
+  scope :without_adhoc,            ->         { where(:adhoc => nil) }
+  scope :with_towhat,              ->(towhat) { where(:towhat => towhat) }
+  scope :with_userid,              ->(userid) { where(:userid => userid) }
 
   serialize :sched_action
   serialize :filter
@@ -141,7 +145,7 @@ class MiqSchedule < ApplicationRecord
     else
       time = (last_run_on && (last_run_on > run_at[:start_time])) ? nil : run_at[:start_time]
     end
-    time.nil? ? nil : time.utc
+    time.try(:utc)
   end
 
   def run_at_to_human(timezone)
@@ -406,7 +410,7 @@ class MiqSchedule < ApplicationRecord
     interval_value = run_at[:interval][:value].to_i
     meth = rails_interval
 
-    meth.nil? ? nil : interval_value.send(meth)
+    meth && interval_value.send(meth)
   end
 
   def self.preload_schedules

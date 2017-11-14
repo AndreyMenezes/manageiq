@@ -3,6 +3,7 @@ class CloudTenant < ApplicationRecord
   TENANT_MAPPING_ASSOCIATIONS = %i(vms_and_templates).freeze
 
   include NewWithTypeStiMixin
+  include CustomActionsMixin
   extend ActsAsTree::TreeWalker
 
   belongs_to :ext_management_system, :foreign_key => "ems_id"
@@ -42,7 +43,7 @@ class CloudTenant < ApplicationRecord
     raise ArgumentError, _("ext_management_system cannot be nil") if ext_management_system.nil?
 
     klass = class_by_ems(ext_management_system)
-    created_cloud_tenant = klass.raw_create_cloud_tenant(ext_management_system, options)
+    klass.raw_create_cloud_tenant(ext_management_system, options)
   end
 
   def self.raw_create_cloud_tenant(_ext_management_system, _options = {})

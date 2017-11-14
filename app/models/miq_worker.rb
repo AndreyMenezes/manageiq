@@ -14,6 +14,9 @@ class MiqWorker < ApplicationRecord
   virtual_column :friendly_name, :type => :string
   virtual_column :uri_or_queue_name, :type => :string
 
+  scope :with_miq_server_id, ->(server_id) { where(:miq_server_id => server_id) }
+  scope :with_status,        ->(status)    { where(:status => status) }
+
   STATUS_CREATING = 'creating'.freeze
   STATUS_STARTING = 'starting'.freeze
   STATUS_STARTED  = 'started'.freeze
@@ -333,7 +336,7 @@ class MiqWorker < ApplicationRecord
   # This converts it back to a Ruby Array safely.
   def queue_name
     begin
-      JSON.parse(self[:queue_name])
+      JSON.parse(self[:queue_name]).sort
     rescue JSON::ParserError, TypeError
       self[:queue_name]
     end
@@ -359,9 +362,18 @@ class MiqWorker < ApplicationRecord
     pid
   end
 
-  def self.build_command_line(guid)
-    command_line = "#{Gem.ruby} #{runner_script} --heartbeat --guid=#{guid} #{name}"
-    ENV['APPLIANCE'] ? "nice #{nice_increment} #{command_line}" : command_line
+  def self.build_command_line(guid, ems_id = nil)
+    raise ArgumentError, "No guid provided" unless guid
+
+    require 'awesome_spawn'
+    cmd = "#{Gem.ruby} #{runner_script}"
+    cmd = "nice #{nice_increment} #{cmd}" if ENV["APPLIANCE"]
+
+    options = {:guid => guid, :heartbeat => nil}
+    if ems_id
+      options[:ems_id] = ems_id.kind_of?(Array) ? ems_id.join(",") : ems_id
+    end
+    "#{AwesomeSpawn::CommandLineBuilder.new.build(cmd, options)} #{name}"
   end
 
   def self.runner_script
@@ -370,8 +382,12 @@ class MiqWorker < ApplicationRecord
     script
   end
 
+  def command_line
+    self.class.build_command_line(*worker_options.values_at(:guid, :ems_id))
+  end
+
   def start_runner_via_spawn
-    pid = Kernel.spawn(self.class.build_command_line(guid), [:out, :err] => [Rails.root.join("log", "evm.log"), "a"])
+    pid = Kernel.spawn(command_line, [:out, :err] => [Rails.root.join("log", "evm.log"), "a"])
     Process.detach(pid)
     pid
   end
@@ -485,7 +501,7 @@ class MiqWorker < ApplicationRecord
 
   def current_timeout
     msg = active_messages.first
-    msg.nil? ? nil : msg.msg_timeout
+    msg.try(:msg_timeout)
   end
 
   def uri_or_queue_name

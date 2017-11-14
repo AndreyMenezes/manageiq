@@ -4,6 +4,7 @@ describe ChargebackContainerImage do
 
     let(:base_options) { {:interval_size => 2, :end_interval_offset => 0, :ext_options => {:tz => 'UTC'} } }
     let(:hourly_rate)       { 0.01 }
+    let(:count_hourly_rate) { 1.00 }
     let(:starting_date) { Time.parse('2012-09-01 23:59:59Z').utc }
     let(:ts) { starting_date.in_time_zone(Metric::Helper.get_time_zone(options[:ext_options])) }
     let(:report_run_time) { month_end }
@@ -13,11 +14,14 @@ describe ChargebackContainerImage do
     let(:ems) { FactoryGirl.create(:ems_openshift) }
 
     let(:hourly_variable_tier_rate) { {:variable_rate => hourly_rate.to_s} }
+    let(:count_hourly_variable_tier_rate) { {:variable_rate => count_hourly_rate.to_s} }
 
     let(:detail_params) do
       {
-        :chargeback_rate_detail_fixed_compute_cost => {:tiers => [hourly_variable_tier_rate]},
-        :chargeback_rate_detail_metering_used      => {:tiers => [hourly_variable_tier_rate]}
+        :chargeback_rate_detail_fixed_compute_cost  => {:tiers => [hourly_variable_tier_rate]},
+        :chargeback_rate_detail_metering_used       => {:tiers => [hourly_variable_tier_rate]},
+        :chargeback_rate_detail_cpu_cores_allocated => {:tiers => [count_hourly_variable_tier_rate]},
+        :chargeback_rate_detail_memory_allocated    => {:tiers => [hourly_variable_tier_rate]}
       }
     end
 
@@ -28,6 +32,9 @@ describe ChargebackContainerImage do
     let(:metric_rollup_params) { {:parent_ems_id => ems.id, :tag_names => ""} }
 
     before do
+      # TODO: remove metering columns form specs
+      described_class.set_columns_hash(:metering_used_metric => :integer, :metering_used_cost => :float)
+
       MiqRegion.seed
       ChargebackRateDetailMeasure.seed
       ChargeableField.seed
@@ -40,7 +47,8 @@ describe ChargebackContainerImage do
       @project = FactoryGirl.create(:container_project, :name => "my project", :ext_management_system => ems)
       @group = FactoryGirl.create(:container_group, :ext_management_system => ems, :container_project => @project,
                                   :container_node => @node)
-      @container = FactoryGirl.create(:kubernetes_container, :container_group => @group, :container_image => @image)
+      @container = FactoryGirl.create(:kubernetes_container, :container_group => @group, :container_image => @image,
+                                      :limit_memory_bytes => 1.megabytes, :limit_cpu_cores => 1.0)
       cat = FactoryGirl.create(:classification, :description => "Environment", :name => "environment", :single_value => true, :show => true)
       c = FactoryGirl.create(:classification, :name => "prod", :description => "Production", :parent_id => cat.id)
       ChargebackRate.set_assignments(:compute, [{ :cb_rate => chargeback_rate, :tag => [c, "container_image"] }])
@@ -92,6 +100,14 @@ describe ChargebackContainerImage do
         expect(subject.metering_used_metric).to eq(hours_in_day)
         expect(subject.metering_used_cost).to eq(hours_in_day * hourly_rate)
       end
+
+      it "allocated fields" do
+        skip('this feature needs to be added to new chargeback rating') if Settings.new_chargeback
+        expect(subject.cpu_cores_allocated_cost).to eq(@container.limit_cpu_cores * count_hourly_rate * hours_in_day)
+        expect(subject.cpu_cores_allocated_metric).to eq(@container.limit_cpu_cores)
+        expect(subject.cpu_cores_allocated_cost).to eq(@container.limit_memory_bytes / 1.megabytes * count_hourly_rate * hours_in_day)
+        expect(subject.cpu_cores_allocated_metric).to eq(@container.limit_memory_bytes / 1.megabytes)
+      end
     end
 
     context "Monthly" do
@@ -116,6 +132,14 @@ describe ChargebackContainerImage do
       it 'calculates metering used hours and cost' do
         expect(subject.metering_used_metric).to eq(hours_in_month)
         expect(subject.metering_used_cost).to eq(hours_in_month * hourly_rate)
+      end
+
+      it "allocated fields" do
+        skip('this feature needs to be added to new chargeback rating') if Settings.new_chargeback
+        expect(subject.cpu_cores_allocated_cost).to eq(@container.limit_cpu_cores * count_hourly_rate * hours_in_month)
+        expect(subject.cpu_cores_allocated_metric).to eq(@container.limit_cpu_cores)
+        expect(subject.cpu_cores_allocated_cost).to eq(@container.limit_memory_bytes / 1.megabytes * count_hourly_rate * hours_in_month)
+        expect(subject.cpu_cores_allocated_metric).to eq(@container.limit_memory_bytes / 1.megabytes)
       end
     end
 
@@ -149,7 +173,7 @@ describe ChargebackContainerImage do
 
   context "New Chargeback" do
     before do
-      ManageIQ::Consumption::ShowbackUsageType.seed
+      ManageIQ::Consumption::ShowbackInputMeasure.seed
 
       stub_settings(:new_chargeback => '1')
     end

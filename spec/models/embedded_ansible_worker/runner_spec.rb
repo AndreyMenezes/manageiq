@@ -1,4 +1,9 @@
 describe EmbeddedAnsibleWorker::Runner do
+  let(:embedded_ansible_instance) { double("EmbeddedAnsible") }
+  before do
+    allow(EmbeddedAnsible).to receive(:new).and_return(embedded_ansible_instance)
+  end
+
   context ".new" do
     let(:miq_server)  {
       s = EvmSpecHelper.create_guid_miq_server_zone[1]
@@ -25,11 +30,11 @@ describe EmbeddedAnsibleWorker::Runner do
     context "#update_embedded_ansible_provider" do
       let(:api_connection) { double("AnsibleAPIConnection") }
       before do
-        EvmSpecHelper.local_guid_miq_server_zone
+        EvmSpecHelper.local_miq_server
         MiqDatabase.seed
         MiqDatabase.first.set_ansible_admin_authentication(:password => "secret")
 
-        allow(EmbeddedAnsible).to receive(:api_connection).and_return(api_connection)
+        allow(embedded_ansible_instance).to receive(:api_connection).and_return(api_connection)
       end
 
       it "creates initial" do
@@ -102,7 +107,7 @@ describe EmbeddedAnsibleWorker::Runner do
       end
 
       it "creates a notification to inform the user that the service has started" do
-        expect(EmbeddedAnsible).to receive(:start)
+        expect(embedded_ansible_instance).to receive(:start)
 
         runner.setup_ansible
 
@@ -112,7 +117,7 @@ describe EmbeddedAnsibleWorker::Runner do
       end
 
       it "creates a notification to inform the user that the role has been assigned" do
-        expect(EmbeddedAnsible).to receive(:start)
+        expect(embedded_ansible_instance).to receive(:start)
 
         runner.setup_ansible
 

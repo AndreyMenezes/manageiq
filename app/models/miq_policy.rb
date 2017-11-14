@@ -30,6 +30,9 @@ class MiqPolicy < ApplicationRecord
   validates_uniqueness_of   :name, :description, :guid
   validates :mode, :inclusion => { :in => %w(compliance control) }
 
+  scope :with_mode,   ->(mode)   { where(:mode => mode) }
+  scope :with_towhat, ->(towhat) { where(:towhat => towhat) }
+
   serialize :expression
 
   @@associations_to_get_policies = [:parent_enterprise, :ext_management_system, :parent_datacenter, :ems_cluster, :parent_resource_pool, :host]
@@ -184,7 +187,7 @@ class MiqPolicy < ApplicationRecord
   def self.evaluate_conditions(plist, target, mode, inputs, result)
     failed = []
     succeeded = []
-    plist.each do|p|
+    plist.each do |p|
       logger.info("MIQ(policy-enforce_policy): Resolving policy [#{p.description}]...")
       if p.conditions.empty?
         always_condition = {"id" => nil, "description" => "always", "result" => "allow"}
@@ -211,7 +214,7 @@ class MiqPolicy < ApplicationRecord
   def self.evaluate_conditions_for_policy(target, policy, mode, inputs)
     cond_result = "allow"
     clist = []
-    policy.conditions.uniq.each do|c|
+    policy.conditions.uniq.each do |c|
       unless c.applies_to?(target, inputs)
         # skip conditions that do not apply based on applies_to_exp
         logger.info("MIQ(policy-enforce_policy): Resolving policy [#{policy.description}], Condition: [#{c.description}] does not apply, skipping...")

@@ -4,9 +4,9 @@ require 'VMwareWebService/MiqVimBroker'
 describe MiqVimBrokerWorker::Runner do
   before(:each) do
     _guid_2, _server_2, @zone_2 = EvmSpecHelper.create_guid_miq_server_zone
-    guid, server, @zone = EvmSpecHelper.create_guid_miq_server_zone
+    _guid, server, @zone = EvmSpecHelper.create_guid_miq_server_zone
     @ems = FactoryGirl.create(:ems_vmware_with_authentication, :zone => @zone)
-    other_ems = FactoryGirl.create(:ems_vmware_with_authentication, :zone => @zone)
+    FactoryGirl.create(:ems_vmware_with_authentication, :zone => @zone)
 
     # General stubbing for testing any worker (methods called during initialize)
     @worker_guid = SecureRandom.uuid
@@ -231,7 +231,7 @@ describe MiqVimBrokerWorker::Runner do
           q = MiqQueue.first
           expect(q.class_name).to eq("EmsRefresh")
           expect(q.method_name).to eq("refresh")
-          expect(q.args).to eq([[[vm.class.name, vm.id]]])
+          expect(q.data).to eq([[vm.class.name, vm.id]])
         end
 
         it "will handle queued Host updates properly" do
@@ -253,7 +253,7 @@ describe MiqVimBrokerWorker::Runner do
           q = MiqQueue.first
           expect(q.class_name).to eq("EmsRefresh")
           expect(q.method_name).to eq("refresh")
-          expect(q.args).to eq([[[host.class.name, host.id]]])
+          expect(q.data).to eq([[host.class.name, host.id]])
         end
 
         it "will handle create events properly" do
@@ -356,7 +356,7 @@ describe MiqVimBrokerWorker::Runner do
           q = MiqQueue.first
           expect(q.class_name).to eq("EmsRefresh")
           expect(q.method_name).to eq("refresh")
-          expect(q.args).to eq([[[vm2.class.name, vm2.id]]])
+          expect(q.data).to eq([[vm2.class.name, vm2.id]])
         end
 
         it "will reconnect to an EMS" do

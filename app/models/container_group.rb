@@ -6,6 +6,7 @@ class ContainerGroup < ApplicationRecord
   include NewWithTypeStiMixin
   include TenantIdentityMixin
   include ArchivedMixin
+  include CustomActionsMixin
   include_concern 'Purging'
 
   # :name, :uid, :creation_timestamp, :resource_version, :namespace
@@ -84,12 +85,12 @@ class ContainerGroup < ApplicationRecord
     return if archived?
     _log.info("Disconnecting Pod [#{name}] id [#{id}] from EMS [#{ext_management_system.name}] id [#{ext_management_system.id}]")
     self.containers.each(&:disconnect_inv)
-    self.container_node_id = nil
     self.container_services = []
     self.container_replicator_id = nil
     self.container_build_pod_id = nil
+    # Keeping old_container_project_id for backwards compatibility, we will need a migration that is putting it back to
+    # container_project_id
     self.old_container_project_id = self.container_project_id
-    self.container_project_id = nil
     self.deleted_on = Time.now.utc
     save
   end

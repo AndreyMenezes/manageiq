@@ -11,6 +11,7 @@ class Host < ApplicationRecord
   include NewWithTypeStiMixin
   include TenantIdentityMixin
   include DeprecationMixin
+  include CustomActionsMixin
 
   VENDOR_TYPES = {
     # DB            Displayed
@@ -43,7 +44,7 @@ class Host < ApplicationRecord
   has_many                  :vms_and_templates, :dependent => :nullify
   has_many                  :vms, :inverse_of => :host
   has_many                  :miq_templates, :inverse_of => :host
-  has_many                  :host_storages
+  has_many                  :host_storages, :dependent => :destroy
   has_many                  :storages, :through => :host_storages
   has_many                  :host_switches, :dependent => :destroy
   has_many                  :switches, :through => :host_switches
@@ -538,11 +539,6 @@ class Host < ApplicationRecord
     ret.include?("unknown") ? nil : ret
   end
 
-  def acts_as_ems?
-    product = vmm_product.to_s.downcase
-    ['hyperv', 'hyper-v'].any? { |p| product.include?(p) }
-  end
-
   def refreshable_status
     if ext_management_system
       return {:show => true, :enabled => true, :message => ""}
@@ -781,9 +777,9 @@ class Host < ApplicationRecord
       # connect_ssh logs address and user name(s) being used to make connection
       _log.info("Verifying Host SSH credentials for [#{name}]")
       connect_ssh(options) { |ssu| ssu.exec("uname -a") }
-    rescue Net::SSH::AuthenticationFailed
+    rescue MiqException::MiqInvalidCredentialsError
       raise MiqException::MiqInvalidCredentialsError, _("Login failed due to a bad username or password.")
-    rescue Net::SSH::HostKeyMismatch
+    rescue MiqException::MiqSshUtilHostKeyMismatch
       raise # Re-raise the error so the UI can prompt the user to allow the keys to be reset.
     rescue Exception => err
       _log.warn(err.inspect)
@@ -816,7 +812,7 @@ class Host < ApplicationRecord
     raise _("Starting address is malformed") if (starting =~ pattern).nil?
     raise _("Ending address is malformed") if (ending =~ pattern).nil?
 
-    starting.split(".").each_index do|i|
+    starting.split(".").each_index do |i|
       if starting.split(".")[i].to_i > 255 || ending.split(".")[i].to_i > 255
         raise _("IP address octets must be 0 to 255")
       end
@@ -829,7 +825,7 @@ class Host < ApplicationRecord
     host_start = starting.split(".").last.to_i
     host_end = ending.split(".").last.to_i
 
-    host_start.upto(host_end) do|h|
+    host_start.upto(host_end) do |h|
       ipaddr = network_id + "." + h.to_s
 
       unless Host.find_by(:ipaddress => ipaddr).nil? # skip discover for existing hosts
@@ -1417,7 +1413,7 @@ class Host < ApplicationRecord
 
             save
           end
-        rescue Net::SSH::HostKeyMismatch
+        rescue MiqException::MiqSshUtilHostKeyMismatch
           # Keep from dumping stack trace for this error which is sufficiently logged in the connect_ssh method
         rescue => err
           _log.log_backtrace(err)

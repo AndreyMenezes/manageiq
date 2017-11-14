@@ -904,16 +904,16 @@ class MiqExpression
     @model_relats[model] ||= build_relats(model)
   end
 
-  def self.miq_adv_search_lists(model, what)
+  def self.miq_adv_search_lists(model, what, extra_options = {})
     @miq_adv_search_lists ||= {}
     @miq_adv_search_lists[model.to_s] ||= {}
+    options = {:include_model => true}.merge(extra_options)
 
     case what.to_sym
     when :exp_available_fields then
-      options = {:typ => "field", :include_model => true, :disallow_loading_virtual_custom_attributes => false}
-      @miq_adv_search_lists[model.to_s][:exp_available_fields] ||= MiqExpression.model_details(model, options)
-    when :exp_available_counts then @miq_adv_search_lists[model.to_s][:exp_available_counts] ||= MiqExpression.model_details(model, :typ => "count", :include_model => true)
-    when :exp_available_finds  then @miq_adv_search_lists[model.to_s][:exp_available_finds]  ||= MiqExpression.model_details(model, :typ => "find",  :include_model => true)
+      @miq_adv_search_lists[model.to_s][:exp_available_fields] ||= MiqExpression.model_details(model, options.merge(:typ => "field", :disallow_loading_virtual_custom_attributes => false))
+    when :exp_available_counts then @miq_adv_search_lists[model.to_s][:exp_available_counts] ||= MiqExpression.model_details(model, options.merge(:typ => "count"))
+    when :exp_available_finds  then @miq_adv_search_lists[model.to_s][:exp_available_finds]  ||= MiqExpression.model_details(model, options.merge(:typ => "find"))
     end
   end
 
@@ -924,15 +924,18 @@ class MiqExpression
       model_details(model, :include_model => false, :include_tags => true, :interval => interval)
     elsif Chargeback.db_is_chargeback?(model)
       cb_model = Chargeback.report_cb_model(model)
+      model.constantize.try(:refresh_dynamic_metric_columns)
       md = model_details(model, :include_model => false, :include_tags => true).select do |c|
-        c.last.ends_with?(*ReportController::Reports::Editor::CHARGEBACK_ALLOWED_FIELD_SUFFIXES)
+        allowed_suffixes = ReportController::Reports::Editor::CHARGEBACK_ALLOWED_FIELD_SUFFIXES
+        allowed_suffixes -= ['_cost'] if model.starts_with?('Metering')
+        c.last.ends_with?(*allowed_suffixes)
       end
       td = if TAG_CLASSES.include?(cb_model)
-             tag_details(model, {}) + _custom_details_for(cb_model, {})
+             tag_details(model, {})
            else
              []
            end
-      md + td
+      md + td + _custom_details_for(cb_model, {})
     else
       model_details(model, :include_model => false, :include_tags => true)
     end

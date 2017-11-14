@@ -377,7 +377,7 @@ module MiqReport::Generator
     objs = build_add_missing_timestamps(objs)
 
     data = build_includes(objs)
-    result = data.collect do|entry|
+    result = data.collect do |entry|
       build_reportable_data(entry, {:only => only_cols, "include" => include}, nil)
     end.flatten
 
@@ -479,8 +479,8 @@ module MiqReport::Generator
 
   def build_correlate_tag_cols
     tags2desc = {}
-    arr = self.cols.inject([]) do|a, c|
-      self.extras[:group_by_tag_cols].each do|tc|
+    arr = self.cols.inject([]) do |a, c|
+      self.extras[:group_by_tag_cols].each do |tc|
         tag = tc[(c.length + 1)..-1]
         if tc.starts_with?(c)
           unless tags2desc.key?(tag)
@@ -497,11 +497,19 @@ module MiqReport::Generator
       a
     end
     arr.sort! { |a, b| a[1] <=> b[1] }
-    while arr.first[1] == "[None]"; arr.push(arr.shift); end unless arr.blank? || (arr.first[1] == "[None]" && arr.last[1] == "[None]")
-    arr.each { |c, h| self.cols.push(c); col_order.push(c); headers.push(h) }
+    while arr.first[1] == "[None]"
+      arr.push(arr.shift)
+    end unless arr.blank? || (arr.first[1] == "[None]" && arr.last[1] == "[None]")
+    arr.each do |c, h|
+      self.cols.push(c)
+      col_order.push(c)
+      headers.push(h)
+    end
 
     tarr = Array(tags2desc).sort_by { |t| t[1] }
-    while tarr.first[1] == "[None]"; tarr.push(tarr.shift); end unless tarr.blank? || (tarr.first[1] == "[None]" && tarr.last[1] == "[None]")
+    while tarr.first[1] == "[None]"
+      tarr.push(tarr.shift)
+    end unless tarr.blank? || (tarr.first[1] == "[None]" && tarr.last[1] == "[None]")
     self.extras[:group_by_tags] = tarr.collect { |a| a[0] }
     self.extras[:group_by_tag_descriptions] = tarr.collect { |a| a[1] }
   end
@@ -595,7 +603,7 @@ module MiqReport::Generator
 
     group_key =  rpt_options[:pivot][:group_cols]
     data = generate_subtotals(data, group_key, options)
-    data = data.inject([]) do |a, (k, v)|
+    data.inject([]) do |a, (k, v)|
       next(a) if k == :_total_
       row = col_order.inject({}) do |h, col|
         if col.include?("__")
@@ -630,7 +638,7 @@ module MiqReport::Generator
   def build_includes(objs)
     results = []
 
-    objs.each do|obj|
+    objs.each do |obj|
       entry = {:obj => obj}
       build_search_includes(obj, entry, include) if include
       results.push(entry)
@@ -640,12 +648,12 @@ module MiqReport::Generator
   end
 
   def build_search_includes(obj, entry, includes)
-    includes.each_key do|assoc|
+    includes.each_key do |assoc|
       next unless obj.respond_to?(assoc)
 
       assoc_objects = [obj.send(assoc)].flatten.compact
 
-      entry[assoc.to_sym] = assoc_objects.collect do|rec|
+      entry[assoc.to_sym] = assoc_objects.collect do |rec|
         new_entry = {:obj => rec}
         build_search_includes(rec, new_entry, includes[assoc]["include"]) if includes[assoc]["include"]
         new_entry
@@ -675,7 +683,8 @@ module MiqReport::Generator
       end
     end
     attrs = attrs.inject({}) do |h, (k, v)|
-      h["#{options[:qualify_attribute_names]}.#{k}"] = v; h
+      h["#{options[:qualify_attribute_names]}.#{k}"] = v
+      h
     end if options[:qualify_attribute_names]
     attrs
   end
@@ -702,7 +711,7 @@ module MiqReport::Generator
           h[c.tag_id] = c.description
         end
 
-        assoc_options[:only].each do|c|
+        assoc_options[:only].each do |c|
           entarr = []
           entry[:obj].tags.each do |t|
             next unless t.name.starts_with?("/managed/#{c}/")

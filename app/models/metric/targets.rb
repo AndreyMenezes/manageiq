@@ -19,7 +19,7 @@ module Metric::Targets
   end
 
   # Filter to enabled hosts. If it has a cluster consult that, otherwise consult the host itself.
-  # 
+  #
   # NOTE: if capture_storage takes only enabled, then move
   # this logic into capture_host_targets
   def self.only_enabled(hosts)
@@ -39,6 +39,12 @@ module Metric::Targets
     end
   end
 
+  def self.with_archived(scope)
+    # We will look also for freshly archived entities, if the entity was short-lived or even sub-hour
+    archived_from = Metric::Capture.targets_archived_from
+    scope.where(:deleted_on => nil).or(scope.where(:deleted_on => (archived_from..Time.now.utc)))
+  end
+
   def self.capture_container_targets(emses, _options)
     includes = {
       :container_nodes  => :tags,
@@ -49,9 +55,9 @@ module Metric::Targets
 
     targets = []
     emses.each do |ems|
-      targets += ems.container_nodes
-      targets += ems.container_groups
-      targets += ems.containers
+      targets += with_archived(ems.all_container_nodes)
+      targets += with_archived(ems.all_container_groups)
+      targets += with_archived(ems.all_containers)
     end
 
     targets
@@ -124,7 +130,7 @@ module Metric::Targets
   # we want to work with only enabled_hosts, so hosts needs to be further filtered
   def self.capture_vm_targets(emses, hosts)
     enabled_host_ids = hosts.select(&:perf_capture_enabled?).index_by(&:id)
-    emses.flat_map { |e| e.vms.select { |v| enabled_host_ids.include?(v.host_id) && v.state == 'on' && v.supports_capture? } }
+    emses.flat_map { |e| e.vms.select { |v| enabled_host_ids.key?(v.host_id) && v.state == 'on' && v.supports_capture? } }
   end
 
   # If a Cluster, standalone Host, or Storage is not enabled, skip it.

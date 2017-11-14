@@ -1,4 +1,33 @@
 describe MiqExpression do
+  describe '#reporting_available_fields' do
+    let(:vm) { FactoryGirl.create(:vm) }
+    let!(:custom_attribute) { FactoryGirl.create(:custom_attribute, :name => 'my_attribute_1', :resource => vm) }
+    let(:extra_fields) do
+      %w(start_date
+         end_date
+         interval_name
+         display_range
+         entity
+         tag_name
+         label_name
+         id
+         vm_id
+         vm_name)
+    end
+
+    it 'lists custom attributes in ChargebackVm' do
+      skip('removing of virtual custom attributes is needed to do first in other specs')
+      
+      displayed_columms = described_class.reporting_available_fields('ChargebackVm').map(&:second)
+      expected_columns = (ChargebackVm.attribute_names - extra_fields).map { |x| "ChargebackVm-#{x}" }
+
+      CustomAttribute.all.each do |custom_attribute|
+        expected_columns.push("#{vm.class}-#{CustomAttributeMixin::CUSTOM_ATTRIBUTES_PREFIX}#{custom_attribute.name}")
+      end
+      expect(displayed_columms).to match_array(expected_columns)
+    end
+  end
+
   describe "#valid?" do
     it "returns true for a valid flat expression" do
       expression = described_class.new("=" => {"field" => "Vm-name", "value" => "foo"})
@@ -3242,6 +3271,10 @@ describe MiqExpression do
   end
 
   describe ".tag_details" do
+    before do
+      described_class.instance_variable_set(:@classifications, nil)
+    end
+
     it "returns the tags when no path is given" do
       Tenant.seed
       FactoryGirl.create(
@@ -3252,6 +3285,26 @@ describe MiqExpression do
       )
       actual = described_class.tag_details(nil, {})
       expect(actual).to eq([["My Company Tags : Environment", "managed-env"]])
+    end
+  end
+
+  describe "miq_adv_search_lists" do
+    it ":exp_available_counts" do
+      result = described_class.miq_adv_search_lists(Vm, :exp_available_counts)
+
+      expect(result.map(&:first)).to include(" VM and Instance.Users")
+    end
+
+    it ":exp_available_finds" do
+      result = described_class.miq_adv_search_lists(Vm, :exp_available_finds)
+
+      expect(result.map(&:first)).to include("VM and Instance.Provisioned VMs : Href Slug")
+      expect(result.map(&:first)).not_to include("VM and Instance : Id")
+    end
+
+    it ":exp_available_fields with include_id_columns" do
+      result = described_class.miq_adv_search_lists(Vm, :exp_available_fields, :include_id_columns => true)
+      expect(result.map(&:first)).to include("VM and Instance : Id")
     end
   end
 end

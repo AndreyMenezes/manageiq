@@ -2,7 +2,7 @@ class Storage < ApplicationRecord
   has_many :vms_and_templates, :foreign_key => :storage_id, :dependent => :nullify, :class_name => "VmOrTemplate"
   has_many :miq_templates,     :foreign_key => :storage_id
   has_many :vms,               :foreign_key => :storage_id
-  has_many :host_storages
+  has_many :host_storages,     :dependent => :destroy
   has_many :hosts,             :through => :host_storages
   has_many :storage_profile_storages,   :dependent  => :destroy
   has_many :storage_profiles,           :through    => :storage_profile_storages
@@ -41,6 +41,7 @@ class Storage < ApplicationRecord
   include AsyncDeleteMixin
   include AvailabilityMixin
   include TenantIdentityMixin
+  include CustomActionsMixin
 
   virtual_column :v_used_space,                   :type => :integer
   virtual_column :v_used_space_percent_of_total,  :type => :integer
@@ -577,7 +578,10 @@ class Storage < ApplicationRecord
   def vm_ids_by_path
     host_ids = hosts.collect(&:id)
     return nil if host_ids.empty?
-    Vm.where(:host_id => host_ids).includes(:storage).inject({}) { |h, v| h[File.dirname(v.path)] = v.id; h }
+    Vm.where(:host_id => host_ids).includes(:storage).inject({}) do |h, v|
+      h[File.dirname(v.path)] = v.id
+      h
+    end
   end
 
   # TODO: Is this still needed?
@@ -697,9 +701,9 @@ class Storage < ApplicationRecord
 
     _log.info("#{log_header} Capture for #{log_target}...")
 
-    klass, meth = Metric::Helper.class_and_association_for_interval_name(interval_name)
+    _klass, meth = Metric::Helper.class_and_association_for_interval_name(interval_name)
 
-    dummy, t = Benchmark.realtime_block(:total_time) do
+    _dummy, t = Benchmark.realtime_block(:total_time) do
       hour = Metric::Helper.nearest_hourly_timestamp(Time.now.utc + 30.minutes)
 
       interval = case interval_name
@@ -777,7 +781,7 @@ class Storage < ApplicationRecord
             vm_attrs[:derived_vm_allocated_disk_storage] = val
             attrs[:derived_vm_allocated_disk_storage] += val unless val.nil?
 
-            ['snapshot', 'mem', 'disk'].each do|a|
+            ['snapshot', 'mem', 'disk'].each do |a|
               col = "derived_storage_#{a}_#{mode}".to_sym
               val = vm_attrs[col]
               attrs[col] ||= 0

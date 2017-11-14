@@ -109,6 +109,7 @@
   - ems_infra_show_list
   - ems_infra_tag
   - ems_infra_timeline
+  - ems_physical_infra_console
   - ems_physical_infra_show
   - ems_physical_infra_show_list
   - ems_physical_infra_tag
@@ -122,6 +123,7 @@
   - my_settings_default_views
   - my_settings_time_profiles
   - my_settings_visuals
+  - middleware_server_check_compliance
   - miq_report_run
   - miq_report_saved_reports
   - miq_report_schedules
@@ -197,6 +199,7 @@
   - ems_infra_show_list
   - ems_infra_tag
   - ems_infra_timeline
+  - ems_physical_infra_console
   - ems_physical_infra_show
   - ems_physical_infra_show_list
   - ems_physical_infra_tag
@@ -211,6 +214,7 @@
   - my_settings_default_views
   - my_settings_time_profiles
   - my_settings_visuals
+  - middleware_server_check_compliance
   - miq_report_run
   - miq_report_saved_reports
   - miq_report_schedules
@@ -347,6 +351,7 @@
   - ems_infra_tag
   - ems_infra_timeline
   - ems_physical_infra_new
+  - ems_physical_infra_console
   - ems_physical_infra_delete
   - ems_physical_infra_discover
   - ems_physical_infra_edit
@@ -371,6 +376,7 @@
   - my_settings_default_views
   - my_settings_time_profiles
   - my_settings_visuals
+  - middleware_server_check_compliance
   - miq_report_run
   - miq_report_saved_reports
   - miq_report_schedules
@@ -471,6 +477,7 @@
   - my_settings_default_views
   - my_settings_time_profiles
   - my_settings_visuals
+  - middleware_server_check_compliance
   - miq_report_run
   - miq_report_saved_reports
   - miq_report_schedules
@@ -541,6 +548,7 @@
   - ems_infra_show_list
   - ems_infra_tag
   - ems_infra_timeline
+  - ems_physical_infra_console
   - ems_physical_infra_show
   - ems_physical_infra_show_list
   - ems_physical_infra_tag
@@ -555,6 +563,7 @@
   - my_settings_default_views
   - my_settings_time_profiles
   - my_settings_visuals
+  - middleware_server_check_compliance
   - miq_report_run
   - miq_report_saved_reports
   - miq_report_schedules
@@ -623,6 +632,7 @@
   - ems_infra_show_list
   - ems_infra_tag
   - ems_infra_timeline
+  - ems_physical_infra_console
   - ems_physical_infra_show
   - ems_physical_infra_show_list
   - ems_physical_infra_tag
@@ -637,6 +647,7 @@
   - my_settings_default_views
   - my_settings_time_profiles
   - my_settings_visuals
+  - middleware_server_check_compliance
   - miq_report_run
   - miq_report_saved_reports
   - miq_report_schedules
@@ -735,6 +746,7 @@
   - all_vm_rules
   - automation_manager
   - embedded_automation_manager
+  - ems_physical_infra_console
   - catalog_items_view
   - compute
   - miq_template_clone
@@ -803,6 +815,7 @@
   - automation_manager
   - embedded_automation_manager
   - compute
+  - middleware_server_check_compliance
   - miq_request_admin
   - miq_request_view
   - miq_template_analyze
@@ -1026,7 +1039,6 @@
   - miq_cloud_networks
   - miq_arbitration_settings
   - miq_arbitration_rules
-  - blueprint
   - redhat_access_insights_admin
   - ems_container_ad_hoc_metrics
   - monitor

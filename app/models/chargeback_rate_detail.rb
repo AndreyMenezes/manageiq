@@ -14,7 +14,7 @@ class ChargebackRateDetail < ApplicationRecord
 
   delegate :metric_key, :cost_keys, :to => :chargeable_field
 
-  FORM_ATTRIBUTES = %i(description per_time per_unit metric group source metric chargeable_field_id).freeze
+  FORM_ATTRIBUTES = %i(description per_time per_unit metric group source metric chargeable_field_id sub_metric).freeze
   PER_TIME_TYPES = {
     "hourly"  => _("Hourly"),
     "daily"   => _("Daily"),
@@ -43,14 +43,14 @@ class ChargebackRateDetail < ApplicationRecord
      'gbps'      => 'Tbps'}[p_per_unit || per_unit]
   end
 
-  def populate_showback_rate(plan, rate_detail, category)
-    measure = rate_detail.chargeable_field.showback_measure
-    dimension, _, calculation = rate_detail.chargeable_field.showback_dimension
-    unit = rate_detail.showback_unit
+  def populate_showback_rate(plan, rate_detail, entity)
+    group = rate_detail.chargeable_field.showback_measure
+    field, _, calculation = rate_detail.chargeable_field.showback_dimension
+    unit  = rate_detail.showback_unit
 
-    showback_rate = ManageIQ::Consumption::ShowbackRate.find_or_create_by(:category            => category,
-                                                                          :measure             => measure,
-                                                                          :dimension           => dimension,
+    showback_rate = ManageIQ::Consumption::ShowbackRate.find_or_create_by(:entity              => entity,
+                                                                          :group               => group,
+                                                                          :field               => field,
                                                                           :showback_price_plan => plan,
                                                                           :calculation         => calculation,
                                                                           :concept             => rate_detail.id)
@@ -67,6 +67,23 @@ class ChargebackRateDetail < ApplicationRecord
     showback_rate.save
   end
 
+  def sub_metrics
+    if metric == 'derived_vm_allocated_disk_storage'
+      volume_types = CloudVolume.volume_types
+      unless volume_types.empty?
+        res = {}
+        res[_('All')] = ''
+        volume_types.each { |type| res[type.capitalize] = type }
+        res[_('Other - Unclassified')] = 'unclassified'
+        res
+      end
+    end
+  end
+
+  def sub_metric_human
+    sub_metric.present? ? sub_metric.capitalize : 'All'
+  end
+
   def charge(relevant_fields, consumption, options)
     result = {}
     if (relevant_fields & [metric_key, cost_keys[0]]).present?
@@ -74,8 +91,8 @@ class ChargebackRateDetail < ApplicationRecord
       if !consumption.chargeback_fields_present && chargeable_field.fixed?
         cost = 0
       end
-      result[metric_key] = metric_value
-      cost_keys.each { |field| result[field] = cost }
+      result[metric_key(sub_metric)] = metric_value
+      cost_keys(sub_metric).each { |field| result[field] = cost }
     end
     result
   end
@@ -207,7 +224,7 @@ class ChargebackRateDetail < ApplicationRecord
   end
 
   def metric_and_cost_by(consumption, options)
-    metric_value = chargeable_field.measure(consumption, options)
+    metric_value = chargeable_field.measure(consumption, options, sub_metric)
     hourly_cost = hourly_cost(metric_value, consumption)
     cost = chargeable_field.metering? ? hourly_cost : hourly_cost * consumption.consumed_hours_in_interval
     [metric_value, cost]
@@ -252,9 +269,22 @@ class ChargebackRateDetail < ApplicationRecord
         end
 
         rate_details.push(detail_new)
+
+        if detail_new.chargeable_field.metric == 'derived_vm_allocated_disk_storage'
+          volume_types = CloudVolume.volume_types
+          volume_types.push('unclassified') if volume_types.present?
+          volume_types.each do |volume_type|
+            storage_detail_new = detail_new.dup
+            storage_detail_new.sub_metric = volume_type
+            detail[:tiers].sort_by { |tier| tier[:start] }.each do |tier|
+              storage_detail_new.chargeback_tiers << ChargebackTier.new(tier.slice(*ChargebackTier::FORM_ATTRIBUTES))
+            end
+            rate_details.push(storage_detail_new)
+          end
+        end
       end
     end
 
-    rate_details.sort_by { |rd| [rd[:group], rd[:description]] }
+    rate_details.sort_by { |rd| [rd.chargeable_field[:group], rd.chargeable_field[:description], rd[:sub_metric].to_s] }
   end
 end

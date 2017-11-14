@@ -446,6 +446,10 @@
       :description: Add a Cloud Provider
       :feature_type: admin
       :identifier: ems_cloud_new
+    - :name: Sync Users
+      :description: Sync Users from Cloud Provider
+      :feature_type: admin
+      :identifier: ems_cloud_user_sync
 
 # Cloud Topology
 - :name: Cloud Topology
@@ -2517,6 +2521,30 @@
       :description: Add a Generic Object Class
       :feature_type: admin
       :identifier: generic_object_definition_new
+    - :name: Add Custom Button Group
+      :description: Add a Custom Button Group for a Generic Object Class
+      :feature_type: control
+      :identifier: generic_object_definition_ab_group_new
+    - :name: Edit Custom Button Group
+      :description: Edit a Custom Button Group for a Generic Object Class
+      :feature_type: control
+      :identifier: generic_object_definition_ab_group_edit
+    - :name: Delete Custom Button Group
+      :description: Delete a Custom Button Group for a Generic Object Class
+      :feature_type: control
+      :identifier: generic_object_definition_ab_group_delete
+    - :name: Add Custom Button
+      :description: Add a Custom Button for a Generic Object Class
+      :feature_type: control
+      :identifier: generic_object_definition_ab_button_new
+    - :name: Edit Custom Button
+      :description: Edit a Custom Button for a Generic Object Class
+      :feature_type: control
+      :identifier: generic_object_definition_ab_button_edit
+    - :name: Delete Custom Button
+      :description: Delete a Custom Button for a Generic Object Class
+      :feature_type: control
+      :identifier: generic_object_definition_ab_button_delete
 
 # Automate Generic Objects
 - :name: Generic Objects
@@ -3800,10 +3828,18 @@
     :feature_type: control
     :identifier: middleware_server_control
     :children:
+    - :name: Manage Policies
+      :description: Manage Policies of Middleware Servers
+      :feature_type: control
+      :identifier: middleware_server_protect
     - :name: Edit Tags
       :description: Edit Tags of Middleware Servers
       :feature_type: control
       :identifier: middleware_server_tag
+    - :name: Check Compliance
+      :description: Check Compliance of Last Known Configuration
+      :feature_type: control
+      :identifier: middleware_server_check_compliance
     - :name: Reload middleware server
       :description: Trigger reload operation for Middleware Server
       :feature_type: admin
@@ -6006,51 +6042,6 @@
     :feature_type: view
     :identifier: miq_cloud_networks_view
 
-# Blueprints
-- :name: Blueprints
-  :description: All Blueprint Access Rules
-  :feature_type: node
-  :identifier: blueprint
-  :children:
-  - :name: View
-    :description: View Blueprint
-    :feature_type: view
-    :identifier: blueprint_view
-    :children:
-    - :name: List
-      :description: List Blueprint
-      :feature_type: view
-      :identifier: blueprint_show_list
-    - :name: Show
-      :description: Show Blueprint
-      :feature_type: view
-      :identifier: blueprint_show
-    - :name: Edit Tags
-      :description: Edit Blueprint Tags
-      :feature_type: control
-      :identifier: blueprint_tag
-  - :name: Modify
-    :description: Modify Blueprint
-    :feature_type: admin
-    :identifier: blueprint_admin
-    :children:
-    - :name: Add
-      :description: Add Blueprint
-      :feature_type: admin
-      :identifier: blueprint_new
-    - :name: Edit
-      :description: Edit Blueprint
-      :feature_type: admin
-      :identifier: blueprint_edit
-    - :name: Remove
-      :description: Remove Blueprint
-      :feature_type: admin
-      :identifier: blueprint_delete
-    - :name: Publish
-      :description: Publish Blueprint
-      :feature_type: admin
-      :identifier: blueprint_publish
-
 # EmsStorage
 - :name: Storage Managers
   :description: Everything under Storage Managers
@@ -6265,6 +6256,10 @@
       :description: Re-check Authentication Status of Physical Infrastructure Providers
       :feature_type: control
       :identifier: ems_physical_infra_recheck_auth_status
+    - :name: Management Console
+      :description: Open a management console
+      :feature_type: control
+      :identifier: ems_physical_infra_console
   - :name: Modify
     :description: Modify Physical Infrastructure Providers
     :feature_type: admin
@@ -6380,6 +6375,10 @@
       :description: Edit Instance Tags
       :feature_type: control
       :identifier: physical_server_tag
+    - :name: Provision Physical Server
+      :description: Provision Physical Server
+      :feature_type: control
+      :identifier: physical_server_provision
 
 # Firmwares
 - :name: Firmwares

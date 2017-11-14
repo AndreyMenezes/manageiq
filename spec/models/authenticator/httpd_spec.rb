@@ -26,8 +26,8 @@ describe Authenticator::Httpd do
   end
 
   before(:each) do
-    wibble = FactoryGirl.create(:miq_group, :description => 'wibble')
-    wobble = FactoryGirl.create(:miq_group, :description => 'wobble')
+    FactoryGirl.create(:miq_group, :description => 'wibble')
+    FactoryGirl.create(:miq_group, :description => 'wobble')
 
     allow(MiqLdap).to receive(:using_ldap?) { false }
   end
@@ -61,6 +61,10 @@ describe Authenticator::Httpd do
     end
 
     let(:username) { 'cheshire' }
+
+    it "Handles missing request parameter" do
+      expect(subject.lookup_by_identity('alice')).to eq(alice)
+    end
 
     it "finds existing users as username" do
       expect(subject.lookup_by_identity('alice', request)).to eq(alice)

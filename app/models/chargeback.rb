@@ -9,8 +9,6 @@ class Chargeback < ActsAsArModel
     :tag_name             => :string,
     :label_name           => :string,
     :fixed_compute_metric => :integer,
-    :metering_used_metric => :integer,
-    :metering_used_cost   => :float
   )
 
   def self.build_results_for_report_chargeback(options)
@@ -97,7 +95,7 @@ class Chargeback < ActsAsArModel
       plan = ManageIQ::Consumption::ShowbackPricePlan.find_or_create_by(:description => rate.description,
                                                                         :name        => rate.description,
                                                                         :resource    => MiqEnterprise.first)
-      
+
       data = {}
       rate.rate_details_relevant_to(relevant_fields).each do |r|
         r.populate_showback_rate(plan, r, showback_category)
@@ -132,6 +130,7 @@ class Chargeback < ActsAsArModel
 
   def calculate_costs(consumption, rates)
     self.fixed_compute_metric = consumption.chargeback_fields_present if consumption.chargeback_fields_present
+    self.class.try(:refresh_dynamic_metric_columns)
 
     rates.each do |rate|
       rate.rate_details_relevant_to(relevant_fields).each do |r|
@@ -144,7 +143,7 @@ class Chargeback < ActsAsArModel
   end
 
   def self.report_cb_model(model)
-    model.gsub(/^Chargeback/, "")
+    model.gsub(/^(Chargeback|Metering)/, "")
   end
 
   def self.db_is_chargeback?(db)
@@ -207,6 +206,14 @@ class Chargeback < ActsAsArModel
 
     define_method(custom_attribute.to_sym) do
       entity.send(custom_attribute)
+    end
+  end
+
+  def self.default_column_for_format(col)
+    if col.start_with?('storage_allocated')
+      col.ends_with?('cost') ? 'storage_allocated_cost' : 'storage_allocated_metric'
+    else
+      col
     end
   end
 

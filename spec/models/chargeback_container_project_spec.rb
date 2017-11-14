@@ -31,11 +31,14 @@ describe ChargebackContainerProject do
     let(:metric_rollup_params) { {:parent_ems_id => ems.id, :tag_names => ""} }
 
     before do
+      # TODO: remove metering columns form specs
+      described_class.set_columns_hash(:metering_used_metric => :integer, :metering_used_cost => :float)
+
       MiqRegion.seed
       ChargebackRateDetailMeasure.seed
       ChargeableField.seed
       MiqEnterprise.seed
-      ManageIQ::Consumption::ShowbackUsageType.seed
+      ManageIQ::Consumption::ShowbackInputMeasure.seed
 
       EvmSpecHelper.create_guid_miq_server_zone
       @project = FactoryGirl.create(:container_project, :name => "my project", :ext_management_system => ems,
@@ -241,7 +244,7 @@ describe ChargebackContainerProject do
 
   context "New Chargeback" do
     before do
-      ManageIQ::Consumption::ShowbackUsageType.seed
+      ManageIQ::Consumption::ShowbackInputMeasure.seed
 
       stub_settings(:new_chargeback => '1')
     end

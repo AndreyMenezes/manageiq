@@ -6,24 +6,22 @@ module ManageIQ
     APP_ROOT = Pathname.new(__dir__).join("../..")
 
     def self.manageiq_plugin_setup(plugin_root = nil)
-      # determine plugin root dir. Assume we are called from a 'bin/setup' script in the plugin root
+      # determine plugin root dir. Assume we are called from a 'bin/' script in the plugin root
       plugin_root ||= Pathname.new(caller_locations.last.absolute_path).dirname.parent
 
-      install_bundler
-      bundle_install(plugin_root)
+      manageiq_plugin_update(plugin_root)
+    end
+
+    def self.manageiq_plugin_update(plugin_root = nil)
+      # determine plugin root dir. Assume we are called from a 'bin/' script in the plugin root
+      plugin_root ||= Pathname.new(caller_locations.last.absolute_path).dirname.parent
+
+      install_bundler(plugin_root)
+      bundle_update(plugin_root)
 
       ensure_config_files
 
       create_database_user if ENV["CI"]
-
-      setup_test_environment(:task_prefix => 'app:', :root => plugin_root)
-    end
-
-    def self.manageiq_plugin_update(plugin_root = nil)
-      # determine plugin root dir. Assume we are called from a 'bin/update' script in the plugin root
-      plugin_root ||= Pathname.new(caller_locations.last.absolute_path).dirname.parent
-
-      bundle_update(plugin_root)
 
       setup_test_environment(:task_prefix => 'app:', :root => plugin_root)
     end
@@ -57,24 +55,18 @@ module ManageIQ
       bower_thread.join
     end
 
-    def self.install_bundler
+    def self.install_bundler(root = APP_ROOT)
       system!("echo 'gem: --no-ri --no-rdoc --no-document' > ~/.gemrc") if ENV['CI']
       system!("gem install bundler -v '#{bundler_version}' --conservative")
-    end
-
-    def self.bundle_install(root = APP_ROOT)
-      system("bundle check", :chdir => root) ||
-        system!("bundle install #{bundle_params}", :chdir => root)
+      system!("bundle config path #{root.join('vendor/bundle').expand_path}", :chdir => root) if ENV["CI"]
     end
 
     def self.bundle_update(root = APP_ROOT)
-      system!("bundle update", :chdir => root)
+      system!("bundle update --jobs=3", :chdir => root)
+      return unless ENV["CI"]
+      lockfile_contents = File.read(root.join("Gemfile.lock"))
+      puts "===== Begin Gemfile.lock =====\n\n#{lockfile_contents}\n\n===== End Gemfile.lock ====="
     end
-
-    def self.bundle_params
-      "--jobs=3 --retry=3 --path=${BUNDLE_PATH:-vendor/bundle}" if ENV['CI']
-    end
-    private_class_method :bundle_params
 
     def self.create_database
       puts "\n== Updating database =="

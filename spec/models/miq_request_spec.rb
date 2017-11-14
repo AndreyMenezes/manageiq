@@ -12,10 +12,12 @@ describe MiqRequest do
         :MiqHostProvisionRequest             => {:host_pxe_install      => "Host Provision"},
         :MiqProvisionConfiguredSystemRequest => {:provision_via_foreman => "#{ui_lookup(:ui_title => 'foreman')} Provision"},
         :VmReconfigureRequest                => {:vm_reconfigure        => "VM Reconfigure"},
+        :VmCloudReconfigureRequest           => {:vm_cloud_reconfigure  => "VM Cloud Reconfigure"},
         :VmMigrateRequest                    => {:vm_migrate            => "VM Migrate"},
         :AutomationRequest                   => {:automation            => "Automation"},
         :ServiceTemplateProvisionRequest     => {:clone_to_service      => "Service Provision"},
         :ServiceReconfigureRequest           => {:service_reconfigure   => "Service Reconfigure"},
+        :PhysicalServerProvisionRequest      => {:provision_physical_server => "Physical Server Provision"}
       }
 
       expect(described_class::REQUEST_TYPES).to eq(expected_request_types)
@@ -425,6 +427,45 @@ describe MiqRequest do
       request = FactoryGirl.create(:miq_provision_request, :requester => user)
       expect(user.current_group).to eq(group1)
       expect(request.get_user.current_group).to eq(group1)
+    end
+  end
+
+  context "#update_request" do
+    before do
+      allow(MiqServer).to receive(:my_zone).and_return("New York")
+    end
+
+    let(:request) do
+      FactoryGirl.create(:miq_provision_request,
+                         :requester => fred,
+                         :options   => {:a => "1"})
+    end
+
+    it "user_message" do
+      msg = "Yabba Dabba Doo"
+      expect(request).not_to receive(:after_update_options)
+      request.update_request({:user_message => msg}, fred)
+
+      request.reload
+      expect(request.options[:user_message]).to eq(msg)
+      expect(request.message).to eq(msg)
+    end
+
+    it "truncates long messages" do
+      msg = "Yabba Dabba Doo" * 30
+      expect(request).not_to receive(:after_update_options)
+      request.update_request({:user_message => msg}, fred)
+
+      request.reload
+      expect(request.options[:user_message].length).to eq(255)
+      expect(request.message.length).to eq(255)
+    end
+
+    it "non user_message should call after_update_options" do
+      expect(request).to receive(:after_update_options)
+      request.update_request({:abc => 1}, fred)
+
+      expect(request.options[:abc]).to eq(1)
     end
   end
 end

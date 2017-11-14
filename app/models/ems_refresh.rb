@@ -47,8 +47,6 @@ module EmsRefresh
             t.ext_management_system
           elsif t.respond_to?(:manager) && t.manager
             t.manager
-          elsif t.kind_of?(Host) && t.acts_as_ems?
-            t
           end
 
       h[e] << t unless e.nil?
@@ -80,7 +78,7 @@ module EmsRefresh
     EmsRefresh.init_console if defined?(Rails::Console)
 
     # Handle targets passed as a single class/id pair, an array of class/id pairs, or an array of references
-    targets = get_target_objects(target, id)
+    targets = get_target_objects(target, id).uniq
 
     # Split the targets into refresher groups
     groups = targets.group_by do |t|
@@ -127,7 +125,7 @@ module EmsRefresh
       target_class = target_class.to_s.constantize unless target_class.kind_of?(Class)
 
       if ManagerRefresh::Inventory.persister_class_for(target_class).blank? &&
-         [VmOrTemplate, Host, ExtManagementSystem, ManagerRefresh::Target].none? { |k| target_class <= k }
+         [VmOrTemplate, Host, PhysicalServer, ExtManagementSystem, ManagerRefresh::Target].none? { |k| target_class <= k }
         _log.warn("Unknown target type: [#{target_class}].")
         next
       end
@@ -171,7 +169,7 @@ module EmsRefresh
 
     # Items will be naturally serialized since there is a dedicated worker.
     MiqQueue.put_or_update(queue_options) do |msg, item|
-      targets = msg.nil? ? targets : (msg.args[0] | targets)
+      targets = msg.nil? ? targets : msg.data.concat(targets)
 
       # If we are merging with an existing queue item we don't need a new
       # task, just use the original one
@@ -191,7 +189,7 @@ module EmsRefresh
         }
       end
       item.merge(
-        :args        => [targets],
+        :data        => targets,
         :task_id     => task_id,
         :msg_timeout => queue_timeout
       )
@@ -202,7 +200,7 @@ module EmsRefresh
 
   def self.create_refresh_task(ems, targets)
     task_options = {
-      :action => "EmsRefresh(#{ems.name}) [#{targets}]",
+      :action => "EmsRefresh(#{ems.name}) [#{targets}]".truncate(255),
       :userid => "system"
     }
 

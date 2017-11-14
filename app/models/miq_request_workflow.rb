@@ -197,11 +197,13 @@ class MiqRequestWorkflow
     case fld[:data_type]
     when :integer
       unless is_integer?(value)
-        fld[:error] = msg; valid = false
+        fld[:error] = msg
+        valid = false
       end
     when :float
       unless is_numeric?(value)
-        fld[:error] = msg; valid = false
+        fld[:error] = msg
+        valid = false
       end
     when :boolean
       # TODO: do we need validation for boolean
@@ -209,12 +211,14 @@ class MiqRequestWorkflow
       # Ignore
     when :array_integer
       unless value.kind_of?(Array)
-        fld[:error] = msg; valid = false
+        fld[:error] = msg
+        valid = false
       end
     else
       data_type = Object.const_get(fld[:data_type].to_s.camelize)
       unless value.kind_of?(data_type)
-        fld[:error] = msg; valid = false
+        fld[:error] = msg
+        valid = false
       end
     end
     [valid, fld]
@@ -506,9 +510,9 @@ class MiqRequestWorkflow
         raise _("No information returned for %{email}") % {:email => email} if (d = l.get_user_info(email)).nil?
         [:first_name, :last_name, :address, :city, :state, :zip, :country, :title, :company,
          :department, :office, :phone, :phone_mobile, :manager, :manager_mail, :manager_phone].each do |prop|
-          @values["owner_#{prop}".to_sym] = d[prop].nil? ? nil : d[prop].dup
+          @values["owner_#{prop}".to_sym] = d[prop].try(:dup)
         end
-        @values[:sysprep_organization] = d[:company].nil? ? nil : d[:company].dup
+        @values[:sysprep_organization] = d[:company].try(:dup)
       end
     end
   end
