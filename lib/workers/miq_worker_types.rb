@@ -20,15 +20,12 @@ MIQ_WORKER_TYPES = {
   "ManageIQ::Providers::Google::CloudManager::MetricsCollectorWorker"           => %i(manageiq_default),
   "ManageIQ::Providers::Google::CloudManager::RefreshWorker"                    => %i(manageiq_default),
   "ManageIQ::Providers::Google::NetworkManager::RefreshWorker"                  => %i(manageiq_default),
-  "ManageIQ::Providers::Hawkular::DatawarehouseManager::EventCatcher"           => %i(manageiq_default),
-  "ManageIQ::Providers::Hawkular::DatawarehouseManager::RefreshWorker"          => %i(manageiq_default),
-  "ManageIQ::Providers::Hawkular::MiddlewareManager::EventCatcher"              => %i(manageiq_default),
-  "ManageIQ::Providers::Hawkular::MiddlewareManager::RefreshWorker"             => %i(manageiq_default),
   "ManageIQ::Providers::Kubernetes::ContainerManager::EventCatcher"             => %i(manageiq_default),
   "ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCollectorWorker"   => %i(manageiq_default),
   "ManageIQ::Providers::Kubernetes::ContainerManager::InventoryCollectorWorker" => %i(manageiq_default),
   "ManageIQ::Providers::Kubernetes::ContainerManager::RefreshWorker"            => %i(manageiq_default),
   "ManageIQ::Providers::Kubernetes::MonitoringManager::EventCatcher"            => %i(manageiq_default),
+  "ManageIQ::Providers::Kubevirt::InfraManager::RefreshWorker"                  => %i(manageiq_default),
   "ManageIQ::Providers::Lenovo::PhysicalInfraManager::EventCatcher"             => %i(manageiq_default),
   "ManageIQ::Providers::Lenovo::PhysicalInfraManager::RefreshWorker"            => %i(manageiq_default),
   "ManageIQ::Providers::Microsoft::InfraManager::RefreshWorker"                 => %i(manageiq_default),
@@ -47,15 +44,12 @@ MIQ_WORKER_TYPES = {
   "ManageIQ::Providers::Openstack::InfraManager::RefreshWorker"                 => %i(manageiq_default),
   "ManageIQ::Providers::Openstack::NetworkManager::EventCatcher"                => %i(manageiq_default),
   "ManageIQ::Providers::Openstack::NetworkManager::MetricsCollectorWorker"      => %i(manageiq_default),
-  "ManageIQ::Providers::Openstack::NetworkManager::RefreshWorker"               => %i(manageiq_default),
   "ManageIQ::Providers::Redhat::InfraManager::EventCatcher"                     => %i(manageiq_default),
   "ManageIQ::Providers::Redhat::InfraManager::MetricsCollectorWorker"           => %i(manageiq_default),
   "ManageIQ::Providers::Redhat::InfraManager::RefreshWorker"                    => %i(manageiq_default),
   "ManageIQ::Providers::Redhat::NetworkManager::EventCatcher"                   => %i(manageiq_default),
   "ManageIQ::Providers::Redhat::NetworkManager::MetricsCollectorWorker"         => %i(manageiq_default),
   "ManageIQ::Providers::Redhat::NetworkManager::RefreshWorker"                  => %i(manageiq_default),
-  "ManageIQ::Providers::StorageManager::CinderManager::RefreshWorker"           => %i(manageiq_default),
-  "ManageIQ::Providers::StorageManager::SwiftManager::RefreshWorker"            => %i(manageiq_default),
   "ManageIQ::Providers::Vmware::CloudManager::EventCatcher"                     => %i(manageiq_default),
   "ManageIQ::Providers::Vmware::CloudManager::RefreshWorker"                    => %i(manageiq_default),
   "ManageIQ::Providers::Vmware::InfraManager::EventCatcher"                     => %i(manageiq_default),
@@ -109,8 +103,6 @@ MIQ_WORKER_TYPES_IN_KILL_ORDER = %w(
   ManageIQ::Providers::EmbeddedAnsible::AutomationManager::RefreshWorker
   ManageIQ::Providers::Foreman::ConfigurationManager::RefreshWorker
   ManageIQ::Providers::Foreman::ProvisioningManager::RefreshWorker
-  ManageIQ::Providers::Hawkular::MiddlewareManager::RefreshWorker
-  ManageIQ::Providers::Hawkular::DatawarehouseManager::RefreshWorker
   ManageIQ::Providers::Kubernetes::ContainerManager::InventoryCollectorWorker
   ManageIQ::Providers::Kubernetes::ContainerManager::RefreshWorker
   ManageIQ::Providers::Lenovo::PhysicalInfraManager::RefreshWorker
@@ -145,11 +137,10 @@ MIQ_WORKER_TYPES_IN_KILL_ORDER = %w(
   ManageIQ::Providers::Azure::CloudManager::EventCatcher
   ManageIQ::Providers::AnsibleTower::AutomationManager::EventCatcher
   ManageIQ::Providers::EmbeddedAnsible::AutomationManager::EventCatcher
-  ManageIQ::Providers::Hawkular::MiddlewareManager::EventCatcher
-  ManageIQ::Providers::Hawkular::DatawarehouseManager::EventCatcher
   ManageIQ::Providers::Google::CloudManager::EventCatcher
   ManageIQ::Providers::Kubernetes::ContainerManager::EventCatcher
   ManageIQ::Providers::Kubernetes::MonitoringManager::EventCatcher
+  ManageIQ::Providers::Kubevirt::InfraManager::RefreshWorker
   ManageIQ::Providers::Openshift::ContainerManager::EventCatcher
   ManageIQ::Providers::Openshift::MonitoringManager::EventCatcher
   ManageIQ::Providers::Lenovo::PhysicalInfraManager::EventCatcher

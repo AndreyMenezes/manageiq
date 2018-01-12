@@ -104,6 +104,12 @@ describe ServiceTemplateProvisionRequest do
         context "active_provisions_by_tenant," do
           let(:quota_method) { :active_provisions_by_tenant }
           it_behaves_like "check_quota"
+
+          it "invalid service_template does not raise error" do
+            requests = load_queue
+            requests.first.update_attributes(:service_template => nil)
+            expect { request.check_quota(quota_method) }.not_to raise_error
+          end
         end
 
         context "active_provisions_by_group," do
@@ -117,6 +123,12 @@ describe ServiceTemplateProvisionRequest do
             {:count => 3, :memory => 3.gigabytes, :cpu => 8, :storage => 1_610_612_736}
           end
           it_behaves_like "check_quota"
+
+          it "fails without requester.email" do
+            load_queue
+            @vmware_user1.update_attributes(:email => nil)
+            expect { request.check_quota(quota_method) }.to raise_error(NoMethodError)
+          end
         end
       end
 

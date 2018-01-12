@@ -68,13 +68,10 @@
 - User
 - VimPerformanceTrend
 - Vm
-- VmCloud
 - ManageIQ::Providers::CloudManager::Vm
 - ManageIQ::Providers::InfraManager::Vm
 - VmPerformance
 - Zone
-- ManageIQ::Providers::MiddlewareManager
-- MiddlewareServer
 :include_tables:
 - advanced_settings
 - archived_container_groups
@@ -121,7 +118,6 @@
 - lans
 - last_compliances
 - linux_initprocesses
-- middleware_servers
 - miq_actions
 - miq_approval_stamps
 - miq_custom_attributes
@@ -243,8 +239,6 @@
   ContainerService: container_service
   ContainerTemplate: container_template
   PersistentVolume: persistent_volume
-  ManageIQ::Providers::MiddlewareManager: ext_management_system
-  MiddlewareServer: middleware_server
 :exclude_from_relats:
   ManageIQ::Providers::CloudManager:
   - hosts

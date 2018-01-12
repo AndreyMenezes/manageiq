@@ -238,7 +238,7 @@ en:
       effective_cpu: CPU - Effective
       effective_memory: Memory - Effective
       ems_cluster_name: Cluster
-      emstype_description: Type
+      emstype_description: Type Description
       enabled: Active
       end_trend_value: End
       evaluation_description: What is evaluated
@@ -683,21 +683,27 @@ en:
     model:
       AuditEvent:               EVM Audit Event
       AvailabilityZone:         Availability Zone
+      BottleneckEvent:          Bottleneck Event
       HostAggregate:            Host Aggregate
       ChargebackVm:             Chargeback for Vms
+      ChargebackContainerImage: Chargeback for Image
       ChargebackContainerProject: Chargeback for Projects
       ChargebackRate:           Chargeback Rate
       Classification:           Category
       CloudNetwork:             Cloud Network
+      CloudResourceQuota:       Cloud Resource Quota
       CloudSubnet:              Cloud Subnet
       CloudTenant:              Cloud Tenant
       CloudVolume:              Cloud Volume
+      CloudVolumeBackup:        Cloud Volume Backup
+      CloudVolumeSnapshot:      Cloud Volume Snapshot
       Compliance:               Compliance History
       Compliances:              Compliance History
       Condition:                Condition
       ContainerBuild:           Build
+      ContainerQuota:           Container Quota
       CustomButton:             Button
-      CustomButtonSet:          Buttons Group
+      CustomButtonSet:          Button Group
       ConfigurationScriptSource: Repository
       Container:                Container
       ContainerPerformance:     Performance - Container
@@ -726,7 +732,9 @@ en:
       Filesystem:               File
       Flavor:                   Flavor
       FloatingIp:               Floating IP
+      GenericObject:            Generic Object
       GenericObjectDefinition:  Generic Object Class
+      GuestApplication:         Guest Application
       Host:                     Host / Node
       HostPerformance:          Performance - Host
       IsoDatastore:             ISO Datastore
@@ -807,6 +815,7 @@ en:
       ManageIQ::Providers::Kubernetes::ContainerManager:                    Container Provider (Kubernetes)
       ManageIQ::Providers::Kubernetes::ContainerManager::ContainerGroup:    Pod (Kubernetes)
       ManageIQ::Providers::Openshift::ContainerManager:                     Container Provider (OpenShift)
+      ManageIQ::Providers::Openshift::ContainerManager::ContainerTemplate:  Container Template (OpenShift)
       ManageIQ::Providers::Amazon::NetworkManager:                          Network Provider (Amazon)
       ManageIQ::Providers::Amazon::NetworkManager::CloudNetwork:            Cloud Network (Amazon)
       ManageIQ::Providers::Amazon::NetworkManager::CloudSubnet:             Cloud Subnet (Amazon)
@@ -848,6 +857,9 @@ en:
       ManageIQ::Providers::Lenovo::PhysicalInfraManager::PhysicalServer:    Physical Server (Lenovo)
       ManageIQ::Providers::Hawkular::MiddlewareManager::MiddlewareServerEap:     Middleware Server (EAP)
       ManageIQ::Providers::Hawkular::MiddlewareManager::MiddlewareServerWildfly: Middleware Server (WildFly)
+      MeteringContainerImage:   Metering for Image
+      MeteringContainerProject: Metering for Project
+      MeteringVm:               Metering for VM
       MiddlewareDatasource:     Middleware Datasource
       MiddlewareDomain:         Middleware Domain
       MiddlewareMessaging:      Middleware Messaging
@@ -880,6 +892,7 @@ en:
       MiqTemplate:              VM Template and Image
       MiqUserRole:              Role
       MiqWidget:                Widget
+      MiqWidgetSet:             Dashboard
       MiqWorker:                EVM Worker
       NetworkPort:              Network Port
       NetworkRouter:            Network Router
@@ -892,6 +905,7 @@ en:
       ManageIQ::Providers::Vmware::CloudManager::OrchestrationTemplate:    vApp Template
       PersistentVolume:         Persistent Volume
       PhysicalServer:           Physical Server
+      PolicyEvent:              Policy Event
       ProductUpdate:            Product Update
       PxeCustomizationTemplate: Customization Template
       PxeImage:                 PXE Image
@@ -909,10 +923,13 @@ en:
       Storage:                  Datastore
       StorageFile:              Datastore File
       StoragePerformance:       Performance - Datastore
+      Switch:                   Switch
+      Tenant:                   Tenant
       TimeProfile:              Time Profile
       User:                     EVM User
       VimPerformanceTrend:      Performance Trend
       Vm:                       VM and Instance
+      VmCloud:                  Instance
       VmdbIndex:                Index
       VmdbTable:                VMDB Table
       VmOrTemplate:             VM or Template
@@ -968,7 +985,7 @@ en:
       container_template:          Template
       container_templates:         Templates
       custom_button:               Button
-      custom_button_set:           Buttons Group
+      custom_button_set:           Button Group
       ems_block_storage:           Block Storage Manager
       ems_block_storages:          Block Storage Managers
       ems_cloud:                   Cloud Provider
@@ -1038,7 +1055,10 @@ en:
       miq_custom_attribute:        EVM Custom Attribute
       miq_custom_attributes:       EVM Custom Attributes
       miq_event_definition:        Event
+      manageiq_providers_cloud_manager: Cloud Manager
+      manageiq_providers_cloud_manager_vms: Instances
       manageiq_providers_foreman_configuration_manager_configuration_profile: Configuration Profile (Foreman)
+      manageiq_providers_network_manager: Cloud Manager
       manageiq_providers_openstack_infra_manager_cloud_networks: Cloud Networks (OpenStack)
       manageiq_providers_openstack_cloud_manager_cloud_tenant: Cloud Tenants (OpenStack)
       miq_provision:               Provision
@@ -1056,6 +1076,7 @@ en:
       miq_servers:                 Servers
       miq_task:                    Task
       miq_template:                VM Template
+      miq_templates:               VM Templates
       miq_worker:                  EVM Worker
       miq_workers:                 EVM Workers
       miq_zone:                    Zone
@@ -1089,14 +1110,6 @@ en:
       volume:                      Volume
       zone:                        Zone
       zones:                       Zones
-
-    data_type:
-      boolean:             Boolean
-      datetime:            Date/Time
-      float:               Float
-      integer:             Integer
-      string:              String
-      time:                Time
 
     ui_title:
       foreman:             Foreman

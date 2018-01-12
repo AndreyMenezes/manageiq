@@ -96,6 +96,20 @@
   :history:
     :keep_drift_states: 6.months
     :purge_window_size: 10000
+:embedded_ansible:
+  :docker:
+    :task_image_name: ansible/awx_task
+    :task_image_tag: latest
+    :web_image_name: ansible/awx_web
+    :web_image_tag: latest
+    :rabbitmq_image_name: rabbitmq
+    :rabbitmq_image_tag: 3
+    :memcached_image_name: memcached
+    :memcached_image_tag: alpine
+  :container:
+    :image_name: manageiq/embedded-ansible
+    :image_tag: latest
+    :service_account: miq-privileged
 :ems:
 # provider specific settings are nested here, but they are in the provider repos
 # e.g.:
@@ -189,8 +203,6 @@
       - VmBeingCreatedEvent
       - VmBeingDeployedEvent
       :name: Creation/Addition
-    :application:
-      :name: Application
     :configuration:
       :critical:
       - ansible_tower_create
@@ -872,6 +884,7 @@
   :level_scvmm: info
   :level_vim: warn
   :level_websocket: info
+  :level_vcloud: info
 :ntp:
   :server:
   - 0.pool.ntp.org
@@ -951,6 +964,7 @@
   :heartbeat_frequency: 30.seconds
   :host:
   :listening_port: '443'
+  :memory_threshold: 2.gigabytes
   :mks_classid: 338095E4-1806-4BA3-AB51-38A3179200E9
   :mks_version: 2.1.0.0
   :monitor_poll: 5.seconds
@@ -1154,6 +1168,7 @@
         :memory_threshold: 2.gigabytes
         :queue_timeout: 20.minutes
         :restart_interval: 6.hours
+        :heartbeat_thread_shutdown_timeout: 10.seconds
     :schedule_worker:
       :container_entities_purge_interval: 1.day
       :binary_blob_purge_interval: 1.hour

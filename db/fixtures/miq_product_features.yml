@@ -2355,7 +2355,7 @@
         :description: Copy Dialog
         :feature_type: admin
         :hidden: true
-        :identifier: dialog_copy
+        :identifier: dialog_copy_editor
       - :name: Delete
         :description: Delete Dialog
         :feature_type: admin
@@ -2452,7 +2452,7 @@
           :hidden: true
           :identifier: ab_group_delete
         - :name: Reorder
-          :description: Buttons Groups
+          :description: Reorder Button Groups
           :feature_type: admin
           :hidden: true
           :identifier: ab_group_reorder
@@ -3877,10 +3877,6 @@
       :description: Edit Tags of Middleware Servers
       :feature_type: control
       :identifier: middleware_server_tag
-    - :name: Check Compliance
-      :description: Check Compliance of Last Known Configuration
-      :feature_type: control
-      :identifier: middleware_server_check_compliance
     - :name: Reload middleware server
       :description: Trigger reload operation for Middleware Server
       :feature_type: admin
@@ -5911,6 +5907,10 @@
         :description: Transform VM
         :feature_type: admin
         :identifier: vm_transform
+      - :name: Mass Transform
+        :description: Transform tagged VMs
+        :feature_type: admin
+        :identifier: vm_transform_mass
       - :name: Edit EVM Server Relationship
         :description: Edit EVM Server Relationship
         :feature_type: admin
@@ -6509,28 +6509,23 @@
     :identifier: physical_infra_topology_view
 
 # Monitor
-- :name: Monitor
-  :description: Everything under Monitor
+- :name: Alerts
+  :description: Alerts
   :feature_type: node
-  :identifier: monitor
+  :identifier: monitor_alerts
   :children:
-  - :name: Alerts
-    :description: Alerts
-    :feature_type: node
-    :identifier: monitor_alerts
-    :children:
-    - :name: Overview
-      :description: Alerts Overview
-      :feature_type: view
-      :identifier: monitor_alerts_overview
-    - :name: All Alerts
-      :description: Show Alerts List
-      :feature_type: view
-      :identifier: monitor_alerts_list
-    - :name: Most Recent Alerts
-      :description: Show Most Recent Alerts
-      :feature_type: view
-      :identifier: monitor_alerts_most_recent
+  - :name: Overview
+    :description: Alerts Overview
+    :feature_type: view
+    :identifier: monitor_alerts_overview
+  - :name: All Alerts
+    :description: Show Alerts List
+    :feature_type: view
+    :identifier: monitor_alerts_list
+  - :name: Most Recent Alerts
+    :description: Show Most Recent Alerts
+    :feature_type: view
+    :identifier: monitor_alerts_most_recent
 
 # API
 - :name: API

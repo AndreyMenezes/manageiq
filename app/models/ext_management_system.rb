@@ -30,7 +30,6 @@ class ExtManagementSystem < ApplicationRecord
   belongs_to :provider
   has_many :child_managers, :class_name => 'ExtManagementSystem', :foreign_key => 'parent_ems_id'
 
-  include CustomAttributeMixin
   belongs_to :tenant
   has_many :container_deployments, :foreign_key => :deployed_on_ems_id, :inverse_of => :deployed_on_ems
   has_many :endpoints, :as => :resource, :dependent => :destroy, :autosave => true
@@ -55,7 +54,7 @@ class ExtManagementSystem < ApplicationRecord
   has_many :policy_events,  -> { order("timestamp") }, :class_name => "PolicyEvent", :foreign_key => "ems_id"
 
   has_many :blacklisted_events, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
-  has_many :miq_alert_statuses, :foreign_key => "ems_id"
+  has_many :miq_alert_statuses, :foreign_key => "ems_id", :dependent => :destroy
   has_many :ems_folders,    :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :ems_clusters,   :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :resource_pools, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
@@ -76,7 +75,7 @@ class ExtManagementSystem < ApplicationRecord
 
   validates :name,     :presence => true, :uniqueness => {:scope => [:tenant_id]}
   validates :hostname, :presence => true, :if => :hostname_required?
-  validate :hostname_uniqueness_valid?, :if => :hostname_required?
+  validate :hostname_uniqueness_valid?, :hostname_format_valid?, :if => :hostname_required?
 
   scope :with_eligible_manager_types, ->(eligible_types) { where(:type => eligible_types) }
 
@@ -90,6 +89,11 @@ class ExtManagementSystem < ApplicationRecord
     existing_hostnames = (self.class.all - [self]).map(&:hostname).compact.map(&:downcase)
 
     errors.add(:hostname, N_("has to be unique per provider type")) if existing_hostnames.include?(hostname.downcase)
+  end
+
+  def hostname_format_valid?
+    return if hostname.ipaddress? || hostname.hostname?
+    errors.add(:hostname, _("format is invalid."))
   end
 
   include NewWithTypeStiMixin
@@ -207,14 +211,13 @@ class ExtManagementSystem < ApplicationRecord
         :event        => "ems_created",
         :target_id    => ems.id,
         :target_class => "ExtManagementSystem",
-        :message      => "%{provider_type} %{provider_name} created" % {
-          :provider_type => Dictionary.gettext("ext_management_systems",
-                                               :type      => :table,
-                                               :notfound  => :titleize,
-                                               :plural    => false,
-                                               :translate => false),
-          :provider_name => ems.name})
+        :message      => "Provider %{provider_name} created" % {:provider_name => ems.name}
+      )
     end
+  end
+
+  def self.raw_connect?(*params)
+    !!raw_connect(*params)
   end
 
   def self.model_name_from_emstype(emstype)
@@ -440,33 +443,52 @@ class ExtManagementSystem < ApplicationRecord
 
   # override destroy_queue from AsyncDeleteMixin
   def self.destroy_queue(ids)
-    find(Array.wrap(ids)).each(&:destroy_queue)
+    find(Array.wrap(ids)).map(&:destroy_queue)
   end
 
   def destroy_queue
-    _log.info("Queuing destroy of #{self.class.name} with id: #{id}")
+    msg = "Queuing destroy of #{self.class.name} with id: #{id}"
+
+    _log.info(msg)
+    task = MiqTask.create(
+      :name    => "Destroying #{self.class.name} with id: #{id}",
+      :state   => MiqTask::STATE_QUEUED,
+      :status  => MiqTask::STATUS_OK,
+      :message => msg,
+    )
+
     child_managers.each(&:destroy_queue)
-    self.class.schedule_destroy_queue(id)
+    self.class.schedule_destroy_queue(id, task.id)
+
+    task.id
   end
 
-  def self.schedule_destroy_queue(id, deliver_on = nil)
+  def self.schedule_destroy_queue(id, task_id, deliver_on = nil)
     MiqQueue.put(
       :class_name  => name,
       :instance_id => id,
       :method_name => "orchestrate_destroy",
       :deliver_on  => deliver_on,
+      :args        => [task_id],
     )
   end
 
   # Wait until all associated workers are dead to destroy this ems
-  def orchestrate_destroy
+  def orchestrate_destroy(task_id)
     disable! if enabled?
 
     if self.destroy == false
-      _log.info("Cannot destroy #{self.class.name} with id: #{id}, workers still in progress. Requeuing destroy...")
-      self.class.schedule_destroy_queue(id, 15.seconds.from_now)
+      msg = "Cannot destroy #{self.class.name} with id: #{id}, workers still in progress. Requeuing destroy..."
+      MiqTask.update_status(task_id, MiqTask::STATE_ACTIVE, MiqTask::STATUS_OK, msg)
+
+      _log.info(msg)
+
+      self.class.schedule_destroy_queue(id, task_id, 15.seconds.from_now)
     else
-      _log.info("#{self.class.name} with id: #{id} destroyed")
+      msg = "#{self.class.name} with id: #{id} destroyed"
+      MiqTask.update_status(task_id, MiqTask::STATE_FINISHED, MiqTask::STATUS_OK, msg)
+
+      _log.info(msg)
     end
   end
 

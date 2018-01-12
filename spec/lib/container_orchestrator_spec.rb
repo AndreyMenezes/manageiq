@@ -1,8 +1,10 @@
 describe ContainerOrchestrator do
   let(:connection)      { subject.send(:connection) }
   let(:kube_connection) { subject.send(:kube_connection) }
-  let(:cert_path)       { Tempfile.new("cert").path }
-  let(:token_path)      { Tempfile.new("servicetoken").path }
+  let(:cert)            { Tempfile.new("cert") }
+  let(:token)           { Tempfile.new("token") }
+  let(:cert_path)       { cert.path }
+  let(:token_path)      { token.path }
   let(:kube_host)       { "kube.example.com" }
   let(:kube_port)       { "8443" }
   let(:namespace)       { "manageiq" }
@@ -156,6 +158,7 @@ describe ContainerOrchestrator do
 
         expect(connection_stub).to receive(:delete_deployment_config).with("dc_name", "manageiq")
         expect(kube_connection_stub).to receive(:delete_replication_controller).with("rc_name", "manageiq")
+        expect(subject).to receive(:scale).with("dc_name", 0)
 
         subject.delete_deployment_config("dc_name")
       end
@@ -167,6 +170,7 @@ describe ContainerOrchestrator do
 
         expect(connection_stub).to receive(:delete_deployment_config).with("dc_name", "manageiq")
         expect(kube_connection_stub).not_to receive(:delete_replication_controller)
+        expect(subject).to receive(:scale).with("dc_name", 0)
 
         subject.delete_deployment_config("dc_name")
       end

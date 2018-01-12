@@ -31,6 +31,7 @@ gem "color",                          "~>1.8"
 gem "config",                         "~>1.3.0",       :require => false
 gem "dalli",                          "~>2.7.4",       :require => false
 gem "default_value_for",              "~>3.0.3"
+gem "docker-api",                     "~>1.33.6",      :require => false
 gem "elif",                           "=0.1.0",        :require => false
 gem "fast_gettext",                   "~>1.2.0"
 gem "gettext_i18n_rails",             "~>1.7.2"
@@ -39,12 +40,14 @@ gem "hamlit",                         "~>2.7.0"
 gem "highline",                       "~>1.6.21",      :require => false
 gem "inifile",                        "~>3.0",         :require => false
 gem "kubeclient",                     "~>2.4.0",       :require => false # For scaling pods at runtime
+gem "linux_admin",                    "~>1.2.0",       :require => false
+gem "log_decorator",                  "~>0.1",         :require => false
 gem "manageiq-api-client",            "~>0.1.0",       :require => false
 gem "manageiq-messaging",                              :require => false, :git => "https://github.com/ManageIQ/manageiq-messaging", :branch => "master"
 gem "manageiq-network_discovery",     "~>0.1.2",       :require => false
 gem "memoist",                        "~>0.15.0",      :require => false
 gem "mime-types",                     "~>2.6.1",       :path => File.expand_path("mime-types-redirector", __dir__)
-gem "more_core_extensions",           "~>3.3"
+gem "more_core_extensions",           "~>3.5"
 gem "nakayoshi_fork",                 "~>0.0.3"  # provides a more CoW friendly fork (GC a few times before fork)
 gem "net-ldap",                       "~>0.14.0",      :require => false
 gem "net-ping",                       "~>1.7.4",       :require => false
@@ -107,6 +110,10 @@ group :kubernetes, :openshift, :manageiq_default do
   manageiq_plugin "manageiq-providers-kubernetes"
 end
 
+group :kubevirt, :manageiq_default do
+  manageiq_plugin "manageiq-providers-kubevirt"
+end
+
 group :lenovo, :manageiq_default do
   manageiq_plugin "manageiq-providers-lenovo"
 end
@@ -130,7 +137,7 @@ end
 
 group :ovirt, :manageiq_default do
   manageiq_plugin "manageiq-providers-ovirt"
-  gem "ovirt_metrics",                  "~>1.4.1",       :require => false
+  gem "ovirt_metrics",                  "~>2.0.0",       :require => false
 end
 
 group :scvmm, :manageiq_default do
@@ -166,7 +173,8 @@ group :rest_api, :manageiq_default do
 end
 
 group :scheduler, :manageiq_default do
-  gem "rufus-scheduler", :git => "https://github.com/chrisarcand/rufus-scheduler.git", :branch => "3-1-with-ruby-2-4-support", :require => false
+  # Modified gems (forked on Github)
+  gem "rufus-scheduler", "=3.1.10.2", :git => "https://github.com/ManageIQ/rufus-scheduler.git", :require => false, :tag => "v3.1.10-2"
 end
 
 group :seed, :manageiq_default do
@@ -207,7 +215,9 @@ unless ENV["APPLIANCE"]
   group :development do
     gem "foreman"
     gem "haml_lint",        "~>0.20.0", :require => false
-    gem "rubocop",          "~>0.49.0", :require => false
+    gem "rubocop",          "~>0.52.1", :require => false
+    # ruby_parser is required for i18n string extraction
+    gem "ruby_parser",                  :require => false
     gem "scss_lint",        "~>0.48.0", :require => false
     gem "yard"
   end
