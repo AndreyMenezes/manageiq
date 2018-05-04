@@ -27,6 +27,10 @@ class ExtManagementSystem < ApplicationRecord
     end
   end
 
+  def self.api_allowed_attributes
+    %w[]
+  end
+
   belongs_to :provider
   has_many :child_managers, :class_name => 'ExtManagementSystem', :foreign_key => 'parent_ems_id'
 
@@ -38,7 +42,7 @@ class ExtManagementSystem < ApplicationRecord
   has_many :non_clustered_hosts, -> { non_clustered }, :class_name => "Host", :foreign_key => "ems_id"
   has_many :clustered_hosts, -> { clustered }, :class_name => "Host", :foreign_key => "ems_id"
   has_many :vms_and_templates, :foreign_key => "ems_id", :dependent => :nullify,
-           :class_name => "VmOrTemplate", :inverse_of => :ext_management_system
+           :inverse_of => :ext_management_system
   has_many :miq_templates,     :foreign_key => :ems_id, :inverse_of => :ext_management_system
   has_many :vms,               :foreign_key => :ems_id, :inverse_of => :ext_management_system
   has_many :operating_systems, :through => :vms_and_templates
@@ -60,6 +64,9 @@ class ExtManagementSystem < ApplicationRecord
   has_many :resource_pools, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :customization_specs, :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :storage_profiles,    :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
+  has_many :physical_racks,      :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
+  has_many :physical_switches,   :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
+  has_many :physical_chassis,    :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :physical_servers,    :foreign_key => "ems_id", :dependent => :destroy, :inverse_of => :ext_management_system
   has_many :customization_scripts, :foreign_key => "manager_id", :dependent => :destroy, :inverse_of => :ext_management_system
 
@@ -149,7 +156,7 @@ class ExtManagementSystem < ApplicationRecord
   virtual_total  :total_miq_templates,     :miq_templates
   virtual_total  :total_hosts,             :hosts
   virtual_total  :total_storages,          :storages
-  virtual_total  :total_clusters,          :clusters
+  virtual_total  :total_clusters,          :ems_clusters
   virtual_column :zone_name,               :type => :string, :uses => :zone
   virtual_column :total_vms_on,            :type => :integer
   virtual_column :total_vms_off,           :type => :integer
@@ -195,6 +202,8 @@ class ExtManagementSystem < ApplicationRecord
                               [ManageIQ::Providers::Microsoft::InfraManager, 'SCVMM']
                             elsif ost.hypervisor.include?(:rhevm)
                               [ManageIQ::Providers::Redhat::InfraManager, 'RHEV-M']
+                            elsif ost.hypervisor.include?(:openstack_infra)
+                              [ManageIQ::Providers::Openstack::InfraManager, 'OpenStack Director']
                             else
                               [ManageIQ::Providers::Vmware::InfraManager, 'Virtual Center']
                             end
@@ -424,7 +433,7 @@ class ExtManagementSystem < ApplicationRecord
   end
 
   def self.ems_infra_discovery_types
-    @ems_infra_discovery_types ||= %w(virtualcenter scvmm rhevm)
+    @ems_infra_discovery_types ||= %w(virtualcenter scvmm rhevm openstack_infra)
   end
 
   def self.ems_physical_infra_discovery_types
@@ -456,46 +465,26 @@ class ExtManagementSystem < ApplicationRecord
       :status  => MiqTask::STATUS_OK,
       :message => msg,
     )
-
-    child_managers.each(&:destroy_queue)
-    self.class.schedule_destroy_queue(id, task.id)
-
+    self.class._queue_task('destroy', [id], task.id)
     task.id
   end
 
-  def self.schedule_destroy_queue(id, task_id, deliver_on = nil)
-    MiqQueue.put(
-      :class_name  => name,
-      :instance_id => id,
-      :method_name => "orchestrate_destroy",
-      :deliver_on  => deliver_on,
-      :args        => [task_id],
-    )
-  end
-
-  # Wait until all associated workers are dead to destroy this ems
-  def orchestrate_destroy(task_id)
+  def destroy(task_id = nil)
     disable! if enabled?
 
-    if self.destroy == false
-      msg = "Cannot destroy #{self.class.name} with id: #{id}, workers still in progress. Requeuing destroy..."
-      MiqTask.update_status(task_id, MiqTask::STATE_ACTIVE, MiqTask::STATUS_OK, msg)
+    _log.info("Destroying #{child_managers.count} child_managers")
+    child_managers.destroy_all
 
-      _log.info(msg)
+    # kill workers
+    MiqWorker.find_alive.where(:queue_name => queue_name).each(&:kill)
 
-      self.class.schedule_destroy_queue(id, task_id, 15.seconds.from_now)
-    else
-      msg = "#{self.class.name} with id: #{id} destroyed"
-      MiqTask.update_status(task_id, MiqTask::STATE_FINISHED, MiqTask::STATUS_OK, msg)
-
-      _log.info(msg)
+    super().tap do
+      if task_id
+        msg = "#{self.class.name} with id: #{id} destroyed"
+        MiqTask.update_status(task_id, MiqTask::STATE_FINISHED, MiqTask::STATUS_OK, msg)
+        _log.info(msg)
+      end
     end
-  end
-
-  before_destroy :assert_no_queues_present
-
-  def assert_no_queues_present
-    throw(:abort) if MiqWorker.find_alive.where(:queue_name => queue_name).any?
   end
 
   def disconnect_inv
@@ -692,6 +681,35 @@ class ExtManagementSystem < ApplicationRecord
 
   def tenant_identity
     User.super_admin.tap { |u| u.current_group = tenant.default_miq_group }
+  end
+
+  def self.inventory_status
+    data = includes(:zone)
+           .select(:id, :parent_ems_id, :zone_id, :type, :name, :total_hosts, :total_vms, :total_clusters)
+           .map do |ems|
+             [
+               ems.region_id, ems.zone.name, ems.class.short_token, ems.name,
+               ems.total_clusters, ems.total_hosts, ems.total_vms, ems.total_storages,
+               ems.try(:containers).try(:count),
+               ems.try(:container_groups).try(:count),
+               ems.try(:container_images).try(:count),
+               ems.try(:container_nodes).try(:count),
+               ems.try(:container_projects).try(:count),
+             ]
+           end
+    return if data.empty?
+    data = data.sort_by { |e| [e[0], e[1], e[2], e[3]] }
+    # remove 0's (except for the region)
+    data = data.map { |row| row.each_with_index.map { |col, i| i.positive? && col.to_s == "0" ? nil : col } }
+    data.unshift(%w(region zone kind ems clusters hosts vms storages containers groups images nodes projects))
+    # remove columns where all values (except for the header) are blank
+    data.first.dup.each do |col_header|
+      col = data.first.index(col_header)
+      if data[1..-1].none? { |row| row[col] }
+        data.each { |row| row.delete_at(col) }
+      end
+    end
+    data
   end
 
   private

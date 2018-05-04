@@ -353,4 +353,20 @@ describe GenericObject do
       expect(service.generic_objects).to be_blank
     end
   end
+
+  context "custom buttons" do
+    describe "#custom_actions" do
+      it "returns list of custom actions retrived from linked GenericObjectDefinition" do
+        expect(definition).to receive(:custom_actions).with(go)
+        go.custom_actions
+      end
+    end
+
+    describe "#custom_action_buttons" do
+      it "returns list of custom action buttons retrived from linked GenericObjectDefinition" do
+        expect(definition).to receive(:custom_action_buttons).with(go)
+        go.custom_action_buttons
+      end
+    end
+  end
 end

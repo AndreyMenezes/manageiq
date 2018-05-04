@@ -83,6 +83,37 @@
   :scanning_job_timeout: 20.minutes
   :concurrent_per_ems: 3
 :database:
+  :maintenance:
+    :reindex_schedule: "1 * * * *"
+    :reindex_tables:
+    - Metric
+    - MiqQueue
+    - MiqWorker
+    :vacuum_schedule: "0 2 * * 6"
+    :vacuum_tables:
+    - BinaryBlob
+    - BinaryBlobPart
+    - CustomizationSpec
+    - EventLog
+    - FirewallRule
+    - Host
+    - Job
+    - MiqQueue
+    - MiqRequestTask
+    - MiqSchedule
+    - MiqScsiLun
+    - MiqScsiTarget
+    - MiqSearch
+    - MiqServer
+    - MiqWorker
+    - Network
+    - PolicyEvent
+    - Snapshot
+    - Storage
+    - StorageFile
+    - Tagging
+    - VimPerformanceState
+    - Vm
   :metrics_collection:
     :collection_schedule: "1 * * * *"
     :daily_rollup_schedule: "23 0 * * *"
@@ -97,6 +128,7 @@
     :keep_drift_states: 6.months
     :purge_window_size: 10000
 :embedded_ansible:
+  :job_data_retention_days: 120
   :docker:
     :task_image_name: ansible/awx_task
     :task_image_tag: latest
@@ -750,6 +782,9 @@
       - USER_UPDATE_STORAGE_POOL_FAILED
       :detail: []
       :name: Storage
+    :update:
+      :detail: []
+      :name: Update
   :task_final_events:
     :ClusterCreatedEvent:
     - CreateClusterEx
@@ -851,8 +886,6 @@
     :port:
     :user:
     :scheme:
-:ldap_synchronization:
-  :ldap_synchronization_schedule: "0 2 * * *"
 :log:
   :collection:
     :archive:
@@ -876,15 +909,21 @@
     :ping_depot_timeout: 20
   :level: info
   :level_rails: info
-  :level_lenovo: info
-  :level_mw: info
-  :level_cn_monitoring: info
   :level_api: info
+  :level_automation: info
+  :level_cn_monitoring: info
   :level_fog: info
+  :level_mw: info
+  :level_nuage: info
+  :level_policy: info
   :level_scvmm: info
+  :level_vcloud: info
   :level_vim: warn
   :level_websocket: info
-  :level_vcloud: info
+:notifications:
+  :history:
+    :purge_window_size: 1000
+    :keep_notifications: 1.week
 :ntp:
   :server:
   - 0.pool.ntp.org
@@ -928,10 +967,12 @@
 :container_entities:
   :history:
     :keep_archived_entities: 6.months
+    :keep_archived_quotas: 6.months
     :purge_window_size: 1000
 :product:
   :maindb: ExtManagementSystem
   :container_deployment_wizard: false
+  :transformation: true
 :prototype:
   :queue_type: miq_queue
   :artemis:
@@ -968,7 +1009,7 @@
   :mks_classid: 338095E4-1806-4BA3-AB51-38A3179200E9
   :mks_version: 2.1.0.0
   :monitor_poll: 5.seconds
-  :name: EVM
+  :monitor_server_roles_timeout: 5.minutes
   :prefetch_max_per_worker: 10
   :prefetch_max_per_worker_dequeue: 100
   :prefetch_min_per_worker_dequeue: 10
@@ -999,13 +1040,14 @@
       :value: 60
     :sync_interval: 30.minutes
     :wait_for_started_timeout: 10.minutes
-  :zone: default
 :session:
   :interval: 60
   :memcache_server: 127.0.0.1:11211
   :memcache_server_opts: "-l 127.0.0.1 -I 1M"
   :show_login_info: true
   :timeout: 3600
+  :log_threshold: 100.kilobytes
+  :element_threshold: 10.kilobytes
 :smartproxy_deploy:
   :queue_timeout: 30.minutes
 :smtp:
@@ -1015,7 +1057,6 @@
   :host: localhost
   :password: ''
   :port: '25'
-  :recipient_address_byte_limit: 100
   :user_name: evmadmin
 :snapshots:
   :create_free_percent: 100
@@ -1041,13 +1082,16 @@
       - vmtx
       - vswp
       - "%redo%"
-  :max_parallel_scans_per_host: 1
+  :max_parallel_scans_per_ems: 5
   :max_qitems_per_scan_request: 0
   :watchdog_interval: 1.minute
 :task:
   :active_task_timeout: 6.hours
 :ui:
   :mark_translated_strings: false
+:vim_performance_states:
+  :history:
+    :purge_window_size: 1000
 :webservices:
   :consume_protocol: https
   :contactwith: ipaddress
@@ -1106,8 +1150,6 @@
         :poll: 20.seconds
       :event_catcher_google:
         :poll: 15.seconds
-      :event_catcher_lenovo:
-        :poll: 15.seconds
       :event_catcher_cinder:
         :poll: 10.seconds
       :event_catcher_swift:
@@ -1139,13 +1181,13 @@
           :poll_method: :normal
           :queue_timeout: 120.minutes
           :restart_interval: 2.hours
+          :dequeue_method: :sql
         :ems_refresh_worker_ansible_tower_automation: {}
         :ems_refresh_worker_embedded_ansible_automation: {}
         :ems_refresh_worker_foreman_configuration: {}
         :ems_refresh_worker_foreman_provisioning: {}
         :ems_refresh_worker_google: {}
         :ems_refresh_worker_google_network: {}
-        :ems_refresh_worker_lenovo_physical_infra: {}
         :ems_refresh_worker_microsoft: {}
         :ems_refresh_worker_nuage_network: {}
         :ems_refresh_worker_cinder: {}
@@ -1189,6 +1231,7 @@
       :log_database_statistics_interval: 1.days
       :memory_threshold: 500.megabytes
       :nice_delta: 3
+      :notifications_purge_interval: 1.day
       :orchestration_stack_retired_interval: 10.minutes
       :performance_collection_interval: 3.minutes
       :performance_collection_start_delay: 5.minutes
@@ -1206,6 +1249,7 @@
       :storage_file_collection_interval: 1.days
       :storage_file_collection_time_utc: 21600
       :task_timeout_check_frequency: 1.hour
+      :vim_performance_states_purge_interval: 1.day
       :vm_retired_interval: 10.minutes
       :yum_update_check: 12.hours
     :ui_worker:

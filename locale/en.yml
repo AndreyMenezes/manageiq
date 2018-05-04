@@ -5,7 +5,7 @@ en:
   product:
     name: ManageIQ
     name_full: ManageIQ
-    copyright: "Copyright (c) 2017 ManageIQ. Sponsored by Red Hat Inc."
+    copyright: "Copyright (c) 2018 ManageIQ. Sponsored by Red Hat Inc."
     support_website: "http://www.manageiq.org"
     support_website_text: "ManageIQ.org"
   activerecord:
@@ -90,7 +90,7 @@ en:
         cpu_ready_delta_summation:     CPU - Time Spent In Ready State (ms)
         cpu_system_delta_summation:    CPU - Time Spent in System State (ms)
         cpu_usagemhz_rate_average:     CPU - Usage Rate for Collected Intervals (MHz)
-        cpu_used_delta_summation:      CPU - Time Used (ms)
+        cpu_used_delta_summation:      CPU - Total time usage (VMware) (ms)
         cpu_wait_delta_summation:      CPU - Time Spent in Wait State (ms)
         derived_cpu_available:         CPU - Total - from VM Analysis (MHz)
         derived_cpu_reserved:          CPU - Reserved (MHz)
@@ -700,23 +700,23 @@ en:
       Compliance:               Compliance History
       Compliances:              Compliance History
       Condition:                Condition
-      ContainerBuild:           Build
+      ContainerBuild:           Container Build
       ContainerQuota:           Container Quota
       CustomButton:             Button
       CustomButtonSet:          Button Group
       ConfigurationScriptSource: Repository
       Container:                Container
       ContainerPerformance:     Performance - Container
-      ContainerGroup:           Pod
+      ContainerGroup:           Container Pod
       ContainerGroupPerformance: Performance - Pod
-      ContainerImageRegistry:   Image Registry
+      ContainerImageRegistry:   Container Image Registry
       ContainerImage:           Container Image
-      ContainerNode:            Node
+      ContainerNode:            Container Node
       ContainerNodePerformance: Performance - Container Node
-      ContainerProject:         Project
-      ContainerProjectPerformance: Performance - ContainerProject
-      ContainerRoute:           Route
-      ContainerReplicator:      Replicator
+      ContainerProject:         Container Project
+      ContainerProjectPerformance: Performance - Container Project
+      ContainerRoute:           Container Route
+      ContainerReplicator:      Container Replicator
       ContainerService:         Container Service
       ContainerTemplate:        Container Template
       EmsCluster:               Cluster / Deployment Role
@@ -735,6 +735,7 @@ en:
       GenericObject:            Generic Object
       GenericObjectDefinition:  Generic Object Class
       GuestApplication:         Guest Application
+      GuestDevice:              Guest Device
       Host:                     Host / Node
       HostPerformance:          Performance - Host
       IsoDatastore:             ISO Datastore
@@ -751,6 +752,7 @@ en:
       ManageIQ::Providers::EmbeddedAnsible::AutomationManager::GoogleCredential:     Credential (Google)
       ManageIQ::Providers::EmbeddedAnsible::AutomationManager::MachineCredential:    Credential (Machine)
       ManageIQ::Providers::EmbeddedAnsible::AutomationManager::NetworkCredential:    Credential (Network)
+      ManageIQ::Providers::EmbeddedAnsible::AutomationManager::VaultCredential:      Credential (Vault)
       ManageIQ::Providers::EmbeddedAnsible::AutomationManager::OpenstackCredential:  Credential (OpenStack)
       ManageIQ::Providers::EmbeddedAnsible::AutomationManager::RackspaceCredential:  Credential (Rackspace)
       ManageIQ::Providers::EmbeddedAnsible::AutomationManager::Satellite6Credential: Credential (Satellite)
@@ -785,6 +787,10 @@ en:
       ManageIQ::Providers::Azure::CloudManager::Vm:                         Instance (Microsoft Azure)
       ManageIQ::Providers::Amazon::CloudManager::Vm:                        Instance (Amazon)
       ManageIQ::Providers::Vmware::CloudManager::Vm:                        Instance (VMware vCloud)
+      ManageIQ::Providers::Amazon::CloudManager::Flavor:                    Flavor (Amazon)
+      ManageIQ::Providers::Google::CloudManager::Flavor:                    Flavor (Google)
+      ManageIQ::Providers::Azure::CloudManager::Flavor:                     Flavor (Microsoft Azure)
+      ManageIQ::Providers::Openstack::CloudManager::Flavor:                 Flavor (OpenStack)
       ManageIQ::Providers::CloudManager::Template:                          Image
       ManageIQ::Providers::Amazon::CloudManager::Template:                  Image (Amazon)
       ManageIQ::Providers::CloudManager::VirtualTemplate:                   Resourceless Server Template
@@ -793,9 +799,8 @@ en:
       ManageIQ::Providers::InfraManager:                                    Infrastructure Provider
       ManageIQ::Providers::InfraManager::Vm:                                Virtual Machine
       ManageIQ::Providers::InfraManager::Template:                          Template
-      ManageIQ::Providers::MiddlewareManager:                               Middleware Provider
       ManageIQ::Providers::NetworkManager:                                  Network Manager
-      ManageIQ::Providers::PhysicalInfraManager:                            Physical Infrastructure Provider 
+      ManageIQ::Providers::PhysicalInfraManager:                            Physical Infrastructure Provider
       ManageIQ::Providers::Openstack::InfraManager:                         Infrastructure Provider (OpenStack)
       ManageIQ::Providers::Microsoft::InfraManager:                         Infrastructure Provider (Microsoft)
       ManageIQ::Providers::Redhat::InfraManager:                            Infrastructure Provider (Red Hat)
@@ -843,6 +848,7 @@ en:
       ManageIQ::Providers::Azure::CloudManager::OrchestrationStack:         Orchestration Stack (Microsoft Azure)
       ManageIQ::Providers::Amazon::CloudManager::OrchestrationStack:        Orchestration Stack (Amazon)
       ManageIQ::Providers::Amazon::NetworkManager::NetworkPort:             Network Port (Amazon)
+      ManageIQ::Providers::Amazon::NetworkManager::NetworkRouter:           Network Router (Amazon)
       ManageIQ::Providers::Azure::NetworkManager:                           Network Manager (Microsoft Azure)
       ManageIQ::Providers::Azure::NetworkManager::NetworkPort:              Network Port (Microsoft Azure)
       ManageIQ::Providers::Openstack::NetworkManager::NetworkPort:          Network Port (OpenStack)
@@ -855,17 +861,10 @@ en:
       ManageIQ::Providers::Vmware::InfraManager::Host:                      Host (Vmware)
       ManageIQ::Providers::Vmware::InfraManager::HostEsx:                   Host (Vmware)
       ManageIQ::Providers::Lenovo::PhysicalInfraManager::PhysicalServer:    Physical Server (Lenovo)
-      ManageIQ::Providers::Hawkular::MiddlewareManager::MiddlewareServerEap:     Middleware Server (EAP)
-      ManageIQ::Providers::Hawkular::MiddlewareManager::MiddlewareServerWildfly: Middleware Server (WildFly)
+      ManageIQ::Providers::Lenovo::PhysicalInfraManager::PhysicalSwitch:    Physical Switch (Lenovo)
       MeteringContainerImage:   Metering for Image
       MeteringContainerProject: Metering for Project
       MeteringVm:               Metering for VM
-      MiddlewareDatasource:     Middleware Datasource
-      MiddlewareDomain:         Middleware Domain
-      MiddlewareMessaging:      Middleware Messaging
-      MiddlewareDeployment:     Middleware Deployment
-      MiddlewareServer:         Middleware Server
-      MiddlewareServerGroup:    Middleware Server Group
       MiqAction:                Action
       MiqAeClass:               Automate Class
       MiqAeDomain:              Automate Domain
@@ -1003,8 +1002,6 @@ en:
       ems_container:               Containers Provider
       ems_containers:              Containers Providers
       ems_datawarehouse:           Datawarehouse Provider
-      ems_middleware:              Middleware Provider
-      ems_middlewares:             Middleware Providers
       ems_object_storage:          Object Storage Manager
       ems_object_storages:         Object Storage Managers
       evm_server:                  EVM Server
@@ -1014,18 +1011,6 @@ en:
       ems_storage:                 Storage Manager
       floating_ips:                Floating IP
       load_balancer:               Load Balancer
-      middleware_server:           Middleware Server
-      middleware_servers:          Middleware Servers
-      middleware_datasource:       Middleware Datasource
-      middleware_datasources:      Middleware Datasources
-      middleware_domain:           Middleware Domain
-      middleware_domains:          Middleware Domains
-      middleware_messaging:        Middleware Messaging
-      middleware_messagings:       Middleware Messagings
-      middleware_deployment:       Middleware Deployment
-      middleware_deployments:      Middleware Deployments
-      middleware_server_group:     Middleware Server Group
-      middleware_server_groups:    Middleware Server Groups
       network_port:                Network Port
       network_router:              Network Router
       evm_owner:                   EVM Owner

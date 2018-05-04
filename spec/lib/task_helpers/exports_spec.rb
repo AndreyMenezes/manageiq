@@ -45,11 +45,11 @@ describe TaskHelpers::Exports do
   describe '.validate_directory' do
     let(:export_dir2) { Dir.tmpdir + "/thisdoesntexist" }
 
-    before(:each) do
+    before do
       @export_dir = Dir.mktmpdir('miq_exp_dir')
     end
 
-    after(:each) do
+    after do
       FileUtils.remove_entry @export_dir
     end
 
@@ -64,6 +64,22 @@ describe TaskHelpers::Exports do
     it 'is not writable' do
       File.chmod(0o500, @export_dir)
       expect(TaskHelpers::Exports.validate_directory(@export_dir)).to eq('Destination directory must be writable')
+    end
+  end
+
+  describe '.exclude_attributes' do
+    let(:all_attributes) do
+      { "id"         => 1,
+        "name"       => "EvmRole-super_administrator",
+        "read_only"  => true,
+        "created_at" => Time.zone.now,
+        "updated_at" => Time.zone.now,
+        "settings"   => nil }
+    end
+
+    it 'removes selected attributes' do
+      filtered_attributes = TaskHelpers::Exports.exclude_attributes(all_attributes, %w(created_at updated_at id))
+      expect(filtered_attributes).to match("name" => "EvmRole-super_administrator", "read_only" => true, "settings" => nil)
     end
   end
 end

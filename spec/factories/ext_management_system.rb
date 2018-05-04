@@ -129,6 +129,13 @@ FactoryGirl.define do
     end
   end
 
+  factory :ems_vmware_with_valid_authentication,
+          :parent => :ems_vmware do
+    after(:create) do |x|
+      x.authentications << FactoryGirl.create(:authentication, :status => "Valid")
+    end
+  end
+
   factory :ems_microsoft,
           :aliases => ["manageiq/providers/microsoft/infra_manager"],
           :class   => "ManageIQ::Providers::Microsoft::InfraManager",
@@ -285,9 +292,7 @@ FactoryGirl.define do
   factory :ems_google,
           :aliases => ["manageiq/providers/google/cloud_manager"],
           :class   => "ManageIQ::Providers::Google::CloudManager",
-          :parent  => :ems_cloud do
-    provider_region "us-central1"
-  end
+          :parent  => :ems_cloud
 
   factory :ems_google_with_authentication,
           :parent => :ems_google do
@@ -299,9 +304,7 @@ FactoryGirl.define do
   factory :ems_google_network,
           :aliases => ["manageiq/providers/google/network_manager"],
           :class   => "ManageIQ::Providers::Google::NetworkManager",
-          :parent  => :ems_network do
-    provider_region "us-central1"
-  end
+          :parent  => :ems_network
 
   # Leaf classes for ems_container
 

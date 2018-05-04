@@ -201,6 +201,43 @@ RSpec.describe MiqExpression::Field do
     end
   end
 
+  describe "#arel_table" do
+    it "returns the main table when there are no associations" do
+      field = described_class.new(Vm, [], "name")
+      expect(field.arel_table).to eq(Vm.arel_table)
+    end
+
+    it "returns the table of the target association without an alias" do
+      field = described_class.new(Vm, ["guest_applications"], "name")
+      expect(field.arel_table).to eq(GuestApplication.arel_table)
+      expect(field.arel_table.name).to eq(GuestApplication.arel_table.name)
+    end
+
+    it "returns the table of the target association with an alias if needed" do
+      field = described_class.new(Vm, ["miq_provision_template"], "name")
+      expect(field.arel_table.table_name).to eq(Vm.arel_table.table_name)
+      expect(field.arel_table.name).not_to eq(Vm.arel_table.name)
+    end
+  end
+
+  describe "#arel_attribute" do
+    it "returns the main table when there are no associations" do
+      field = described_class.new(Vm, [], "name")
+      expect(field.arel_attribute).to eq(Vm.arel_attribute("name"))
+    end
+
+    it "returns the table of the target association without an alias" do
+      field = described_class.new(Vm, ["guest_applications"], "name")
+      expect(field.arel_attribute).to eq(GuestApplication.arel_attribute("name"))
+    end
+
+    it "returns the table of the target association with an alias if needed" do
+      field = described_class.new(Vm, ["miq_provision_template"], "name")
+      expect(field.arel_attribute.name).to eq("name")
+      expect(field.arel_attribute.relation.name).to include("miq_provision_template")
+    end
+  end
+
   describe "#plural?" do
     it "returns false if the column is on a 'belongs_to' association" do
       field = described_class.new(Vm, ["storage"], "region_description")
@@ -235,13 +272,21 @@ RSpec.describe MiqExpression::Field do
     end
   end
 
-  describe "sql detection" do
+  describe "#attribute_supported_by_sql?" do
     it "detects if column is supported by sql with custom_attribute" do
       expect(MiqExpression::Field.parse("Vm-virtual_custom_attribute_example").attribute_supported_by_sql?).to be_falsey
     end
 
     it "detects if column is supported by sql with regular column" do
       expect(MiqExpression::Field.parse("Vm-name").attribute_supported_by_sql?).to be_truthy
+    end
+
+    it "detects if column is supported by sql through regular association" do
+      expect(MiqExpression::Field.parse("Host.vms-name").attribute_supported_by_sql?).to be_truthy
+    end
+
+    it "detects if column is supported by sql through virtual association" do
+      expect(MiqExpression::Field.parse("Vm.service-name").attribute_supported_by_sql?).to be_falsey
     end
   end
 
@@ -282,6 +327,20 @@ RSpec.describe MiqExpression::Field do
 
     it "detects string as non-numeric" do
       expect(MiqExpression::Field.parse("Vm-name")).not_to be_numeric
+    end
+  end
+
+  describe "#reflection_supported_by_sql?" do
+    it "detects if column is accessed directly" do
+      expect(MiqExpression::Field.parse("Host-name")).to be_reflection_supported_by_sql
+    end
+
+    it "detects if column is accessed through regular association" do
+      expect(MiqExpression::Field.parse("Host.vms-name")).to be_reflection_supported_by_sql
+    end
+
+    it "detects if column is accessed through regular virtual association" do
+      expect(MiqExpression::Field.parse("Vm.service-name")).not_to be_reflection_supported_by_sql
     end
   end
 

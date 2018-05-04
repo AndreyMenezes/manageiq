@@ -5,6 +5,7 @@ module ManageIQ::Providers
 
     include AvailabilityMixin
     include HasMonitoringManagerMixin
+    include HasInfraManagerMixin
     include SupportsFeatureMixin
 
     has_many :container_nodes, -> { active }, :foreign_key => :ems_id
@@ -13,7 +14,7 @@ module ManageIQ::Providers
     has_many :container_replicators, :foreign_key => :ems_id, :dependent => :destroy
     has_many :containers, -> { active }, :foreign_key => :ems_id
     has_many :container_projects, -> { active }, :foreign_key => :ems_id
-    has_many :container_quotas, :foreign_key => :ems_id, :dependent => :destroy
+    has_many :container_quotas, -> { active }, :foreign_key => :ems_id
     has_many :container_limits, :foreign_key => :ems_id, :dependent => :destroy
     has_many :container_image_registries, :foreign_key => :ems_id, :dependent => :destroy
     has_many :container_images, -> { active }, :foreign_key => :ems_id
@@ -45,7 +46,13 @@ module ManageIQ::Providers
     has_many :all_container_projects, :foreign_key => :ems_id, :dependent => :destroy, :class_name => "ContainerProject"
     has_many :all_container_images, :foreign_key => :ems_id, :dependent => :destroy, :class_name => "ContainerImage"
     has_many :all_container_nodes, :foreign_key => :ems_id, :dependent => :destroy, :class_name => "ContainerNode"
+    has_many :all_container_quotas, :foreign_key => :ems_id, :dependent => :destroy, :class_name => "ContainerQuota"
 
+    has_one :infra_manager,
+            :foreign_key => :parent_ems_id,
+            :class_name  => "ManageIQ::Providers::Kubevirt::InfraManager",
+            :autosave    => true,
+            :dependent   => :destroy
 
     virtual_column :port_show, :type => :string
 
@@ -91,6 +98,16 @@ module ManageIQ::Providers
 
     def port_show
       port.to_s
+    end
+
+    def endpoint_created(role)
+      monitoring_endpoint_created(role) if respond_to?(:monitoring_endpoint_created)
+      virtualization_endpoint_created(role) if respond_to?(:virtualization_endpoint_created)
+    end
+
+    def endpoint_destroyed(role)
+      monitoring_endpoint_destroyed(role) if respond_to?(:monitoring_endpoint_destroyed)
+      virtualization_endpoint_destroyed(role) if respond_to?(:virtualization_endpoint_destroyed)
     end
   end
 end

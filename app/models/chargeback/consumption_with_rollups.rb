@@ -41,6 +41,13 @@ class Chargeback
       values.present? ? values.max : 0
     end
 
+    def sum_of_maxes_from_grouped_values(metric, sub_metric = nil)
+      return max(metric, sub_metric) if sub_metric
+      @grouped_values ||= {}
+      grouped_rollups = @rollups.group_by { |x| x.resource.id }
+      @grouped_values[metric] ||= grouped_rollups.map { |_, rollups| rollups.collect(&metric.to_sym).compact.max }.compact.sum
+    end
+
     def avg(metric, sub_metric = nil)
       metric_sum = values(metric, sub_metric).sum
       metric_sum / consumed_hours_in_interval
@@ -55,8 +62,8 @@ class Chargeback
       end
     end
 
-    def none?(metric)
-      values(metric).empty?
+    def none?(metric, sub_metric)
+      values(metric, sub_metric).empty?
     end
 
     def chargeback_fields_present

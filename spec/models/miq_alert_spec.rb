@@ -1,6 +1,6 @@
 describe MiqAlert do
   context "With single server with a single generic worker with the notifier role," do
-    before(:each) do
+    before do
       @miq_server = EvmSpecHelper.local_miq_server(:role => 'notifier')
       @worker = FactoryGirl.create(:miq_worker, :miq_server_id => @miq_server.id)
       @vm     = FactoryGirl.create(:vm_vmware)
@@ -23,7 +23,7 @@ describe MiqAlert do
     end
 
     context "where a vm_scan_complete event is raised for a VM" do
-      before(:each) do
+      before do
         MiqAlert.all.each { |a| a.update_attribute(:enabled, true) } # enable out of the box alerts
         MiqAlert.evaluate_alerts(@vm, "vm_scan_complete")
       end
@@ -39,7 +39,7 @@ describe MiqAlert do
     end
 
     context "where a vm_scan_complete event is raised for a VM" do
-      before(:each) do
+      before do
         MiqAlert.all.each { |a| a.update_attribute(:enabled, true) } # enable out of the box alerts
         @events_to_alerts.each do |arr|
           MiqAlert.evaluate_alerts([@vm.class.base_class.name, @vm.id], arr.first)
@@ -61,7 +61,7 @@ describe MiqAlert do
     end
 
     context "where all alerts are disabled" do
-      before(:each) do
+      before do
         MiqAlert.all.each { |a| a.update_attribute(:enabled, false) }
         MiqAlert.evaluate_alerts([@vm.class.base_class.name, @vm.id], "vm_scan_complete")
       end
@@ -73,12 +73,12 @@ describe MiqAlert do
     end
 
     context "with a single alert, not evaluated" do
-      before(:each) do
+      before do
         @alert = MiqAlert.find_by(:description => "VM Unregistered")
       end
 
       context "with a delay_next_evaluation value of 5 minutes" do
-        before(:each) do
+        before do
           @alert.options ||= {}
           @alert.options.store_path(:notifications, :delay_next_evaluation, 5.minutes)
         end
@@ -92,7 +92,7 @@ describe MiqAlert do
     end
 
     context "with a single alert, evaluated to true" do
-      before(:each) do
+      before do
         @alert = MiqAlert.find_by(:description => "VM Unregistered")
         allow(@alert).to receive_messages(:eval_expression => true)
       end
@@ -159,7 +159,7 @@ describe MiqAlert do
       it "miq_alert_status.description = miq_alert.description event if overriden by ems_event.description" do
         @alert.evaluate(
           [@vm.class.base_class.name, @vm.id],
-          :ems_event => FactoryGirl.create(:ems_event, :message => "oh no!", :type => 'WhateverEvent')
+          :ems_event => FactoryGirl.create(:ems_event, :message => "oh no!")
         )
         mas = @alert.miq_alert_statuses.where(:resource_type => @vm.class.base_class.name, :resource_id => @vm.id).first
         expect(mas.description).to eq("VM Unregistered")
@@ -247,7 +247,7 @@ describe MiqAlert do
       end
 
       context "with the alert now evaluated to false" do
-        before(:each)  do
+        before do
           @alert.evaluate([@vm.class.base_class.name, @vm.id])
           allow(@alert).to receive_messages(:eval_expression => false)
           @alert.options.store_path(:notifications, :delay_next_evaluation, 0)
@@ -272,7 +272,7 @@ describe MiqAlert do
       end
 
       context "with a delay_next_evaluation value of 5 minutes" do
-        before(:each) do
+        before do
           @alert.evaluate([@vm.class.base_class.name, @vm.id])
           @alert.options ||= {}
           @alert.options.store_path(:notifications, :delay_next_evaluation, 5.minutes)
@@ -294,7 +294,7 @@ describe MiqAlert do
     end
 
     context "where all alerts are unassigned" do
-      before(:each) do
+      before do
         @original_assigned     = MiqAlert.assigned_to_target(@vm, "vm_perf_complete") # force cache load
         @original_assigned_all = MiqAlert.assigned_to_target(@vm)                     # force cache load
         MiqAlertSet.all.each(&:remove_all_assigned_tos)
@@ -454,6 +454,7 @@ describe MiqAlert do
       @miq_server = EvmSpecHelper.local_miq_server
       @ems        = FactoryGirl.create(:ems_vmware, :zone => @miq_server.zone)
       @ems_other  = FactoryGirl.create(:ems_vmware, :zone => FactoryGirl.create(:zone, :name => 'other'))
+      @ems_kub    = FactoryGirl.create(:ems_kubernetes, :zone => @miq_server.zone)
       @alert      = FactoryGirl.create(:miq_alert, :responds_to_events => "_hourly_timer_")
       @alert_prof = FactoryGirl.create(:miq_alert_set, :alerts => [@alert])
     end
@@ -464,6 +465,7 @@ describe MiqAlert do
       @alert_prof.assign_to_objects(@ems.id, "ExtManagementSystem")
 
       expect(MiqAlert).to receive(:evaluate_alerts).with(@ems, "_hourly_timer_")
+      expect(MiqAlert).to receive(:evaluate_alerts).with(@ems_kub, "_hourly_timer_")
       MiqAlert.evaluate_hourly_timer
     end
 
@@ -502,6 +504,17 @@ describe MiqAlert do
       expect(MiqAlert).to receive(:evaluate_alerts).once.with(storage_no_ems, "_hourly_timer_")
       expect(MiqAlert).not_to receive(:evaluate_alerts).with(storage_in_another, "_hourly_timer_")
       MiqAlert.evaluate_hourly_timer
+    end
+
+    it "evaluates for container entities" do
+      [:container_node, :container_group, :container_replicator, :container].each do |entity|
+        container_entity_in_zone = FactoryGirl.create(entity, :ext_management_system => @ems_kub)
+        @alert.update_attributes(:db => entity.to_s.camelize)
+        @alert_prof.mode = container_entity_in_zone.class.base_model.name
+        @alert_prof.assign_to_objects(container_entity_in_zone.id, entity.to_s.camelize)
+        expect(MiqAlert).to receive(:evaluate_alerts).once.with(container_entity_in_zone, "_hourly_timer_")
+        MiqAlert.evaluate_hourly_timer
+      end
     end
   end
 
@@ -558,16 +571,6 @@ describe MiqAlert do
         ActiveRecord::RecordInvalid,
         'Validation failed: Notifications Datawarehouse alerts must have a 0 notification frequency'
       )
-    end
-
-    it 'Does allow creation of hawkular_alert miq_alerts with delay_next_evaluation > 0 ' do
-      expect do
-        FactoryGirl.create(
-          :miq_alert,
-          :options    => {:notifications => {:delay_next_evaluation => 600, :evm_event => {}}},
-          :expression => {:eval_method => "mw_heap_used"}
-        )
-      end.to_not raise_error
     end
   end
 end

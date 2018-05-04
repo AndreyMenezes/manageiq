@@ -107,7 +107,7 @@ describe ChargebackVm do
 
       context "by service" do
         let(:options) { base_options.merge(:interval => 'monthly', :interval_size => 4, :service_id => @service.id) }
-        before(:each) do
+        before do
           @service = FactoryGirl.create(:service)
           @service << @vm1
           @service.save
@@ -187,6 +187,12 @@ describe ChargebackVm do
             expect(subject.storage_allocated_hdd_cost).to eq(state_data[:allocated_disk_types]['hdd'] / 1.gigabytes * count_hourly_rate * hours_in_day)
           end
 
+          it 'shows rates' do
+            skip('this feature needs to be added to new chargeback rating') if Settings.new_chargeback
+            expect(subject.storage_allocated_sdd_rate).to eq("0.0/1.0")
+            expect(subject.storage_allocated_hdd_rate).to eq("0.0/1.0")
+          end
+
           it "doesn't return removed cloud volume types fields" do
             described_class.refresh_dynamic_metric_columns
 
@@ -199,6 +205,49 @@ describe ChargebackVm do
             described_class.refresh_dynamic_metric_columns
             fields = described_class.attribute_names
             expect(fields).not_to include(cloud_volume_hdd_field)
+          end
+
+          context 'without including metrics' do
+            let(:ssd_volume_type) { 'ssd' }
+            let(:ssd_size_1) { 1_234 }
+            let!(:cloud_volume_1) { FactoryGirl.create(:cloud_volume_openstack, :volume_type => ssd_volume_type, :size => ssd_size_1) }
+
+            let(:ssd_disk_1) { FactoryGirl.create(:disk, :size => ssd_size_1, :backing => cloud_volume_1) }
+
+            let(:ssd_size_2) { 4_234 }
+            let!(:cloud_volume_2) { FactoryGirl.create(:cloud_volume_openstack, :volume_type => ssd_volume_type, :size => ssd_size_2) }
+
+            let(:ssd_disk_2) { FactoryGirl.create(:disk, :size => ssd_size_2, :backing => cloud_volume_2) }
+
+            let(:hardware) { FactoryGirl.create(:hardware, :disks => [ssd_disk_1, ssd_disk_2]) }
+
+            let(:resource) { FactoryGirl.create(:vm_vmware_cloud, :hardware => hardware, :created_on => month_beginning) }
+
+            let(:storage_chargeback_rate) { FactoryGirl.create(:chargeback_rate, :detail_params => detail_params, :rate_type => "Storage") }
+
+            let(:parent_classification) { FactoryGirl.create(:classification) }
+            let(:classification)        { FactoryGirl.create(:classification, :parent_id => parent_classification.id) }
+
+            let(:rate_assignment_options) { {:cb_rate => storage_chargeback_rate, :object => MiqEnterprise.first } }
+            let(:options) { base_options.merge(:interval => 'daily', :tag => nil, :entity_id => resource.id, :include_metrics => false) }
+
+            before do
+              # create rate detail for cloud volume
+              allocated_storage_rate_detail = storage_chargeback_rate.chargeback_rate_details.detect { |x| x.chargeable_field.metric == 'derived_vm_allocated_disk_storage' }
+              new_rate_detail = allocated_storage_rate_detail.dup
+              new_rate_detail.sub_metric = ssd_volume_type
+              new_rate_detail.chargeback_tiers = allocated_storage_rate_detail.chargeback_tiers.map(&:dup)
+              new_rate_detail.save
+              storage_chargeback_rate.chargeback_rate_details << new_rate_detail
+              storage_chargeback_rate.save
+
+              ChargebackRate.set_assignments(:storage, [rate_assignment_options])
+            end
+
+            it 'reports sub metric and costs' do
+              skip('this case needs to be fixed in new chargeback') if Settings.new_chargeback
+              expect(subject.storage_allocated_ssd_metric).to eq(ssd_size_1 + ssd_size_2)
+            end
           end
         end
 
@@ -369,6 +418,196 @@ describe ChargebackVm do
         end
       end
 
+      context 'monthly report, group by tenants' do
+        let(:options) do
+          {
+            :interval                     => "monthly",
+            :interval_size                => 12,
+            :end_interval_offset          => 1,
+            :tenant_id                    => tenant_1.id,
+            :method_for_allocated_metrics => :max,
+            :include_metrics              => true,
+            :groupby                      => "tenant",
+          }
+        end
+
+        let(:monthly_used_rate)      { hourly_rate * hours_in_month }
+        let(:monthly_allocated_rate) { count_hourly_rate * hours_in_month }
+
+        # My Company
+        #   \___Tenant 2
+        #   \___Tenant 3
+        #     \__Tenant 4
+        #     \__Tenant 5
+        #
+        let(:tenant_1) { Tenant.root_tenant }
+        let(:vm_1_1)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_1, :miq_group => nil) }
+        let(:vm_2_1)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_1, :miq_group => nil) }
+
+        let(:tenant_2) { FactoryGirl.create(:tenant, :name => 'Tenant 2', :parent => tenant_1) }
+        let(:vm_1_2)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_2, :miq_group => nil) }
+        let(:vm_2_2)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_2, :miq_group => nil) }
+
+        let(:tenant_3) { FactoryGirl.create(:tenant, :name => 'Tenant 3', :parent => tenant_1) }
+        let(:vm_1_3)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_3, :miq_group => nil) }
+        let(:vm_2_3)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_3, :miq_group => nil) }
+
+        let(:tenant_4) { FactoryGirl.create(:tenant, :name => 'Tenant 4', :divisible => false, :parent => tenant_3) }
+        let(:vm_1_4)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_4, :miq_group => nil) }
+        let(:vm_2_4)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_4, :miq_group => nil) }
+
+        let(:tenant_5) { FactoryGirl.create(:tenant, :name => 'Tenant 5', :divisible => false, :parent => tenant_3) }
+        let(:vm_1_5)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_5, :miq_group => nil) }
+        let(:vm_2_5)   { FactoryGirl.create(:vm_vmware, :tenant => tenant_5, :miq_group => nil) }
+
+        subject { ChargebackVm.build_results_for_report_ChargebackVm(options).first }
+
+        let(:derived_vm_numvcpus_tenant_5) { 1 }
+        let(:cpu_usagemhz_rate_average_tenant_5) { 50 }
+
+        before do
+          add_metric_rollups_for([vm_1_1, vm_2_1], month_beginning...month_end, 8.hours, metric_rollup_params.merge!(:derived_vm_numvcpus => 1, :cpu_usagemhz_rate_average => 50))
+          add_metric_rollups_for([vm_1_2, vm_2_2], month_beginning...month_end, 8.hours, metric_rollup_params.merge!(:derived_vm_numvcpus => 1, :cpu_usagemhz_rate_average => 50))
+          add_metric_rollups_for([vm_1_3, vm_2_3], month_beginning...month_end, 8.hours, metric_rollup_params.merge!(:derived_vm_numvcpus => 1, :cpu_usagemhz_rate_average => 50))
+          add_metric_rollups_for([vm_1_4, vm_2_4], month_beginning...month_end, 8.hours, metric_rollup_params.merge!(:derived_vm_numvcpus => 1, :cpu_usagemhz_rate_average => 50))
+          add_metric_rollups_for([vm_1_5, vm_2_5], month_beginning...month_end, 8.hours, metric_rollup_params.merge!(:derived_vm_numvcpus => derived_vm_numvcpus_tenant_5, :cpu_usagemhz_rate_average => cpu_usagemhz_rate_average_tenant_5))
+        end
+
+        it 'reports each tenants' do
+          expect(subject.map(&:tenant_name)).to match_array([tenant_1, tenant_2, tenant_3, tenant_4, tenant_5].map(&:name))
+        end
+
+        def subject_row_for_tenant(tenant)
+          subject.detect { |x| x.tenant_name == tenant.name }
+        end
+
+        let(:hourly_usage) { 30 * 3.0 / 720 } # count of metric rollups / hours in month
+
+        it 'calculates allocated,used metric with using max,avg method with vcpus=1.0 and 50% usage' do
+          # sum of maxes from each VM:
+          # (max from first tenant_1's VM +  max from second tenant_1's VM) * monthly_allocated_rate
+          expect(subject_row_for_tenant(tenant_1).cpu_allocated_metric).to eq(1 + 1)
+          expect(subject_row_for_tenant(tenant_1).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+          expect(subject_row_for_tenant(tenant_2).cpu_allocated_metric).to eq(1 + 1)
+          expect(subject_row_for_tenant(tenant_2).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+          expect(subject_row_for_tenant(tenant_3).cpu_allocated_metric).to eq(1 + 1)
+          expect(subject_row_for_tenant(tenant_3).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+          expect(subject_row_for_tenant(tenant_4).cpu_allocated_metric).to eq(1 + 1)
+          expect(subject_row_for_tenant(tenant_4).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+          expect(subject_row_for_tenant(tenant_5).cpu_allocated_metric).to eq(1 + 1)
+          expect(subject_row_for_tenant(tenant_5).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+          # each tenant has 2 VMs and each VM  has 50 of cpu usage:
+          # 5 tenants(tenant_1 has 4 tenants and plus tenant_1 ) * 2 VMs * 50% of usage
+          expect(subject_row_for_tenant(tenant_1).cpu_used_metric).to eq(2 * 50 * hourly_usage)
+          # and cost - there is multiplication by monthly_used_rate
+          expect(subject_row_for_tenant(tenant_1).cpu_used_cost).to eq(2 * 50 * hourly_usage * monthly_used_rate)
+
+          expect(subject_row_for_tenant(tenant_2).cpu_used_metric).to eq(2 * 50 * hourly_usage)
+          expect(subject_row_for_tenant(tenant_2).cpu_used_cost).to eq(2 * 50 * hourly_usage * monthly_used_rate)
+
+          expect(subject_row_for_tenant(tenant_3).cpu_used_metric).to eq(2 * 50 * hourly_usage)
+          expect(subject_row_for_tenant(tenant_3).cpu_used_cost).to eq(2 * 50 * hourly_usage * monthly_used_rate)
+
+          expect(subject_row_for_tenant(tenant_4).cpu_used_metric).to eq(2 * 50 * hourly_usage)
+          expect(subject_row_for_tenant(tenant_4).cpu_used_cost).to eq(2 * 50 * hourly_usage * monthly_used_rate)
+
+          expect(subject_row_for_tenant(tenant_5).cpu_used_metric).to eq(2 * 50 * hourly_usage)
+          expect(subject_row_for_tenant(tenant_5).cpu_used_cost).to eq(2 * 50 * hourly_usage * monthly_used_rate)
+        end
+
+        context 'vcpu=5 for VMs of tenant_5' do
+          let(:derived_vm_numvcpus_tenant_5)       { 5 }
+          let(:cpu_usagemhz_rate_average_tenant_5) { 75 }
+
+          it 'calculates allocated,used metric with using max,avg method with vcpus=1.0 and 50% usage' do
+            expect(subject_row_for_tenant(tenant_1).cpu_allocated_metric).to eq(1 + 1)
+            expect(subject_row_for_tenant(tenant_1).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+            expect(subject_row_for_tenant(tenant_2).cpu_allocated_metric).to eq(1 + 1)
+            expect(subject_row_for_tenant(tenant_2).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+            expect(subject_row_for_tenant(tenant_3).cpu_allocated_metric).to eq(1 + 1)
+            expect(subject_row_for_tenant(tenant_3).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+            expect(subject_row_for_tenant(tenant_4).cpu_allocated_metric).to eq(1 + 1)
+            expect(subject_row_for_tenant(tenant_4).cpu_allocated_cost).to eq((1 + 1) * monthly_allocated_rate)
+
+            expect(subject_row_for_tenant(tenant_5).cpu_allocated_metric).to eq(5 + 5)
+            expect(subject_row_for_tenant(tenant_5).cpu_allocated_cost).to eq((5 + 5) * monthly_allocated_rate)
+
+            # each tenant has 2 VMs and each VM  has 50 of cpu usage:
+            # 5 tenants(tenant_1 has 4 tenants and plus tenant_1 ) * 2 VMs * 50% of usage
+            # but tenant_5 has  2 VMs and each VM  has 75 of cpu usage
+            expect(subject_row_for_tenant(tenant_1).cpu_used_metric).to eq(hourly_usage * 2 * 50)
+            # and cost - there is multiplication by  monthly_used_rate
+            expect(subject_row_for_tenant(tenant_1).cpu_used_cost).to eq(hourly_usage * 2 * 50 * monthly_used_rate)
+
+            expect(subject_row_for_tenant(tenant_2).cpu_used_metric).to eq(hourly_usage * 2 * 50)
+            expect(subject_row_for_tenant(tenant_2).cpu_used_cost).to eq(hourly_usage * 2 * 50 * monthly_used_rate)
+
+            expect(subject_row_for_tenant(tenant_3).cpu_used_metric).to eq(hourly_usage * 2 * 50)
+            expect(subject_row_for_tenant(tenant_3).cpu_used_cost).to eq(hourly_usage * 2 * 50 * monthly_used_rate)
+
+            expect(subject_row_for_tenant(tenant_4).cpu_used_metric).to eq(hourly_usage * 2 * 50)
+            expect(subject_row_for_tenant(tenant_4).cpu_used_cost).to eq(hourly_usage * 2 * 50 * monthly_used_rate)
+
+            expect(subject_row_for_tenant(tenant_5).cpu_used_metric).to eq(hourly_usage * 2 * 75)
+            expect(subject_row_for_tenant(tenant_5).cpu_used_cost).to eq(hourly_usage * 2 * 75 * monthly_used_rate)
+          end
+
+          context 'test against group by vm report' do
+            let(:options_group_vm) do
+              {
+                :interval                     => "monthly",
+                :interval_size                => 12,
+                :end_interval_offset          => 1,
+                :tenant_id                    => tenant_1.id,
+                :method_for_allocated_metrics => :max,
+                :include_metrics              => true,
+                :groupby                      => "vm"
+              }
+            end
+
+            def result_row_for_vm(vm)
+              result_group_by_vm.detect { |x| x.vm_name == vm.name }
+            end
+
+            let(:result_group_by_vm) { ChargebackVm.build_results_for_report_ChargebackVm(options_group_vm).first }
+
+            it 'calculates used metric and cost same as report for each vm' do
+              # Tenant 1 VMs
+              all_vms_cpu_metric = [vm_1_1, vm_2_1].map { |vm| result_row_for_vm(vm).cpu_used_metric }.sum
+              all_vms_cpu_cost   = [vm_1_1, vm_2_1].map { |vm| result_row_for_vm(vm).cpu_used_cost }.sum
+
+              # Tenant 1
+              expect(subject_row_for_tenant(tenant_1).cpu_used_metric).to eq(all_vms_cpu_metric)
+              expect(subject_row_for_tenant(tenant_1).cpu_used_cost).to eq(all_vms_cpu_cost)
+
+              # Tenant 5 Vms
+              result_vm15 = result_row_for_vm(vm_1_5)
+              result_vm25 = result_row_for_vm(vm_2_5)
+
+              expect(subject_row_for_tenant(tenant_5).cpu_used_metric).to eq(result_vm15.cpu_used_metric + result_vm25.cpu_used_metric)
+              expect(subject_row_for_tenant(tenant_5).cpu_used_cost).to eq(result_vm15.cpu_used_cost + result_vm25.cpu_used_cost)
+            end
+
+            it 'calculated allocted metric and cost with using max(max is not summed up - it is taken maximum)' do
+              # Tenant 1 VMs
+              all_vms_cpu_metric = [vm_1_1, vm_2_1].map { |vm| result_row_for_vm(vm).cpu_allocated_metric }.sum
+              all_vms_cpu_cost   = [vm_1_1, vm_2_1].map { |vm| result_row_for_vm(vm).cpu_allocated_cost }.sum
+
+              expect(subject_row_for_tenant(tenant_1).cpu_allocated_metric).to eq(all_vms_cpu_metric)
+              expect(subject_row_for_tenant(tenant_1).cpu_allocated_cost).to eq(all_vms_cpu_cost)
+            end
+          end
+        end
+      end
+
       context "Monthly" do
         let(:options) { base_options.merge(:interval => 'monthly') }
         before do
@@ -383,6 +622,25 @@ describe ChargebackVm do
           expect(subject.cpu_used_metric).to be_within(0.01).of(used_metric)
           expect(subject.cpu_used_cost).to be_within(0.01).of(used_metric * hourly_rate * hours_in_month)
           expect(subject.cpu_allocated_cost).to be_within(0.01).of(cpu_count * count_hourly_rate * hours_in_month)
+        end
+
+        context 'with nonzero fixed rate' do
+          let(:hourly_variable_tier_rate) { {:fixed_rate => 100, :variable_rate => hourly_rate.to_s} }
+
+          it 'shows rates' do
+            skip('this case needs to be added in new chargeback') if Settings.new_chargeback
+
+            expect(subject.cpu_allocated_rate).to eq("0.0/1.0")
+            expect(subject.cpu_used_rate).to eq("100.0/0.01")
+            expect(subject.disk_io_used_rate).to eq("100.0/0.01")
+            expect(subject.fixed_compute_1_rate).to eq("100.0/0.01")
+            expect(subject.memory_allocated_rate).to eq("100.0/0.01")
+            expect(subject.memory_used_rate).to eq("100.0/0.01")
+            expect(subject.metering_used_rate).to eq("0.0/1.0")
+            expect(subject.net_io_used_rate).to eq("100.0/0.01")
+            expect(subject.storage_allocated_rate).to eq("0.0/1.0")
+            expect(subject.storage_used_rate).to eq("0.0/1.0")
+          end
         end
 
         let(:fixed_rate) { 10.0 }
@@ -513,6 +771,45 @@ describe ChargebackVm do
         it "return tenant chargeback detail rate" do
           expect(@rate).not_to be_nil
           expect(@rate.id).to eq(@assigned_rate[:cb_rate].id)
+        end
+
+        context "selecting based on tagged cloud volumes" do
+          let!(:cloud_volume_sdd) { FactoryGirl.create(:cloud_volume_openstack, :volume_type => 'sdd') }
+
+          let(:ssd_size) { 1_234 }
+          let(:ssd_disk) { FactoryGirl.create(:disk, :size => ssd_size, :backing => cloud_volume_sdd) }
+          let(:hardware) { FactoryGirl.create(:hardware, :disks => [ssd_disk]) }
+
+          let(:resource) { FactoryGirl.create(:vm_vmware_cloud, :hardware => hardware, :created_on => month_beginning) }
+
+          let(:consumption) { Chargeback::ConsumptionWithoutRollups.new(resource, nil, nil) }
+
+          let(:storage_chargeback_rate) { FactoryGirl.create(:chargeback_rate, :rate_type => "Storage") }
+
+          let(:parent_classification) { FactoryGirl.create(:classification) }
+          let(:classification)        { FactoryGirl.create(:classification, :parent_id => parent_classification.id) }
+
+          let(:rate_assignment_options) { {:cb_rate => storage_chargeback_rate, :tag => [classification, "storage"]} }
+
+          subject { Chargeback::RatesCache.new.get(consumption).first }
+
+          it "chooses rate according to cloud_volume\'s tag" do
+            skip('this feature needs to be added to new chargeback assignments') if Settings.new_chargeback
+
+            cloud_volume_sdd.tag_with([classification.tag.name], :ns => '*')
+
+            ChargebackRate.set_assignments(:storage, [rate_assignment_options])
+            expect(subject).to eq(storage_chargeback_rate)
+          end
+
+          it "doesn't choose rate thanks to missing tag on cloud_volume" do
+            skip('this feature needs to be added to new chargeback assignments') if Settings.new_chargeback
+
+            ChargebackRate.set_assignments(:storage, [rate_assignment_options])
+
+            @rate = Chargeback::RatesCache.new.get(consumption).first
+            expect(subject).to be_nil
+          end
         end
       end
 

@@ -37,7 +37,7 @@ describe MiqExpression do
         let(:volume_2_type_field_cost) { "#{model}-storage_allocated_#{volume_2.volume_type}_cost" }
         let(:volume_3_type_field_cost) { "#{model}-storage_allocated_#{volume_3.volume_type}_cost" }
 
-        before(:each) do
+        before do
           volume_1
           volume_2
         end
@@ -404,6 +404,21 @@ describe MiqExpression do
     it "generates the SQL for a CONTAINS expression with field" do
       sql, * = MiqExpression.new("CONTAINS" => {"field" => "Vm.guest_applications-name", "value" => "foo"}).to_sql
       expect(sql).to eq("\"vms\".\"id\" IN (SELECT DISTINCT \"guest_applications\".\"vm_or_template_id\" FROM \"guest_applications\" WHERE \"guest_applications\".\"name\" = 'foo')")
+    end
+
+    it "cant generates the SQL for a CONTAINS expression with association.association-field" do
+      sql, * = MiqExpression.new("CONTAINS" => {"field" => "Vm.guest_applications.host-name", "value" => "foo"}).to_sql
+      expect(sql).to be_nil
+    end
+
+    it "cant generat the SQL for a CONTAINS expression virtualassociation" do
+      sql, * = MiqExpression.new("CONTAINS" => {"field" => "Vm.processes-name", "value" => "foo"}).to_sql
+      expect(sql).to be_nil
+    end
+
+    it "cant generat the SQL for a CONTAINS expression with [association.virtualassociation]" do
+      sql, * = MiqExpression.new("CONTAINS" => {"field" => "Vm.users.active_vms-name", "value" => "foo"}).to_sql
+      expect(sql).to be_nil
     end
 
     it "generates the SQL for a CONTAINS expression with field containing a scope" do

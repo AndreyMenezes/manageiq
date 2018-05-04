@@ -1,6 +1,13 @@
 describe MiqServer do
   include_examples ".seed called multiple times"
 
+  context "#hostname" do
+    it("with a valid hostname")    { expect(MiqServer.new(:hostname => "test").hostname).to eq("test") }
+    it("with a valid fqdn")        { expect(MiqServer.new(:hostname => "test.example.com").hostname).to eq("test.example.com") }
+    it("with an invalid hostname") { expect(MiqServer.new(:hostname => "test_host").hostname).to be_nil }
+    it("without a hostname")       { expect(MiqServer.new.hostname).to be_nil }
+  end
+
   context ".my_guid" do
     let(:guid_file) { Rails.root.join("GUID") }
 
@@ -228,7 +235,7 @@ describe MiqServer do
     end
 
     context "with a worker" do
-      before(:each) do
+      before do
         @worker = FactoryGirl.create(:miq_worker, :miq_server_id => @miq_server.id, :pid => Process.pid)
         allow(@miq_server).to receive(:validate_worker).and_return(true)
         @miq_server.setup_drb_variables
@@ -276,7 +283,7 @@ describe MiqServer do
       end
 
       context "with an active messsage and a second server" do
-        before(:each) do
+        before do
           @msg = FactoryGirl.create(:miq_queue, :state => 'dequeue')
           @miq_server2 = FactoryGirl.create(:miq_server, :is_master => true, :zone => @zone)
         end
@@ -341,7 +348,7 @@ describe MiqServer do
     end
 
     context "with server roles" do
-      before(:each) do
+      before do
         @server_roles = []
         [
           ['event',                  1],
@@ -357,7 +364,7 @@ describe MiqServer do
       end
 
       context "activating All roles" do
-        before(:each) do
+        before do
           @miq_server.activate_all_roles
         end
 
@@ -367,7 +374,7 @@ describe MiqServer do
       end
 
       context "activating Event role" do
-        before(:each) do
+        before do
           @miq_server.activate_roles("event")
         end
 

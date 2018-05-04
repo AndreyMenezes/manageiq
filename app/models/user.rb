@@ -48,6 +48,8 @@ class User < ApplicationRecord
   serialize     :settings, Hash   # Implement settings column as a hash
   default_value_for(:settings) { Hash.new }
 
+  scope :with_same_userid, ->(id) { where(:userid => User.find(id).userid) }
+
   def self.with_allowed_roles_for(user_or_group)
     includes(:miq_groups => :miq_user_role).where.not(:miq_user_roles => {:name => user_or_group.disallowed_roles})
   end
@@ -203,6 +205,14 @@ class User < ApplicationRecord
     self.current_group = groups.first if current_group.nil? || !groups.include?(current_group)
   end
 
+  def change_current_group
+    user_groups = miq_group_ids
+    user_groups.delete(current_group_id)
+    raise _("The user's current group cannot be changed because the user does not belong to any other group") if user_groups.empty?
+    self.current_group = MiqGroup.find_by(:id => user_groups.first)
+    save!
+  end
+
   def admin?
     self.class.admin?(userid)
   end
@@ -275,8 +285,9 @@ class User < ApplicationRecord
     Thread.current[:user] ||= find_by_userid(current_userid)
   end
 
-  def self.with_current_user_groups
-    current_user.admin_user? ? all : includes(:miq_groups).where(:miq_groups => {:id => current_user.miq_group_ids})
+  def self.with_current_user_groups(user = nil)
+    user ||= current_user
+    user.admin_user? ? all : includes(:miq_groups).where(:miq_groups => {:id => user.miq_group_ids})
   end
 
   def self.missing_user_features(db_user)

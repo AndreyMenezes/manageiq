@@ -81,7 +81,7 @@ module MiqServer::RoleManagement
 
     ids = roles == ["*"] ? server_roles.pluck(:id) : ServerRole.where(:name => roles).pluck(:id)
     assigned_server_roles.where(:server_role_id => ids).each do |a|
-      next if a.database_owner?
+      next if a.server_role == ServerRole.database_owner
       next if a.active == active
       active ? a.activate : a.deactivate
     end
@@ -123,7 +123,7 @@ module MiqServer::RoleManagement
   end
 
   def server_role_names
-    server_roles.collect(&:name).sort
+    server_roles.pluck(:name).sort
   end
   alias_method :my_roles,            :server_role_names
   alias_method :assigned_role_names, :server_role_names
@@ -145,7 +145,7 @@ module MiqServer::RoleManagement
 
         # MiqServer#server_role_names may include database scoped roles, which are managed elsewhere,
         # so ignore them when determining added and removed roles.
-        current -= ServerRole.database_scoped_role_names
+        current -= ServerRole.database_roles.pluck(:name)
 
         # TODO: Change this to use replace method under Rails 2.x
         removes = ServerRole.where(:name => (current - desired))
@@ -174,11 +174,11 @@ module MiqServer::RoleManagement
   end
 
   def inactive_role_names
-    inactive_roles.collect(&:name).sort
+    inactive_roles.pluck(:name).sort
   end
 
   def active_role_names
-    active_roles.collect(&:name).sort
+    active_roles.pluck(:name).sort
   end
 
   def active_role
@@ -262,8 +262,12 @@ module MiqServer::RoleManagement
     end
   end
 
+  def monitor_server_roles_timeout
+    ::Settings.server.monitor_server_roles_timeout.to_i_with_method
+  end
+
   def monitor_server_roles
-    MiqRegion.my_region.lock do |region|
+    MiqRegion.my_region.lock(:exclusive, monitor_server_roles_timeout) do |region|
       region.zones.each do |zone|
         synchronize_active_roles(zone.active_miq_servers.includes([:active_roles, :inactive_roles]), ServerRole.zone_scoped_roles)
       end

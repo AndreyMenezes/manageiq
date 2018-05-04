@@ -60,8 +60,15 @@ module MiqServer::UpdateManagement
   def attempt_registration
     return unless register
     attach_products
+    configure_yum_proxy
     # HACK: #enable_repos is not always successful immediately after #attach_products, retry to ensure they are enabled.
     5.times { repos_enabled? ? break : enable_repos }
+    update_attributes(:upgrade_message => "Registration process completed successfully")
+    _log.info("Registration process completed successfully")
+  rescue LinuxAdmin::SubscriptionManagerError => e
+    _log.error("Registration Failed: #{e.message}")
+    Notification.create(:type => "server_registration_error", :options => {:server_name => MiqServer.my_server.name})
+    raise
   end
 
   def register
@@ -100,6 +107,16 @@ module MiqServer::UpdateManagement
     update_attributes(:upgrade_message => "attaching products")
     _log.info("Attaching products based on installed certificates")
     LinuxAdmin::SubscriptionManager.subscribe(assemble_registration_options)
+  end
+
+  def configure_yum_proxy
+    registration_options = assemble_registration_options
+    return unless registration_options[:proxy_address]
+    conf = IniFile.load("/etc/yum.conf")
+    conf["main"]["proxy"] = registration_options[:proxy_address]
+    conf["main"]["proxy_username"] = registration_options[:proxy_username] if registration_options[:proxy_username]
+    conf["main"]["proxy_password"] = registration_options[:proxy_password] if registration_options[:proxy_password]
+    conf.save
   end
 
   def repos_enabled?

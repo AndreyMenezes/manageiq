@@ -33,11 +33,11 @@ class MiqScheduleWorker::Jobs
   end
 
   def host_authentication_check_schedule
-    queue_work_on_each_zone(:class_name  => "Host", :method_name => "authentication_check_schedule")
+    queue_work_on_each_zone(:class_name  => "Host", :method_name => "authentication_check_schedule", :priority => MiqQueue::HIGH_PRIORITY)
   end
 
   def ems_authentication_check_schedule
-    queue_work_on_each_zone(:class_name  => "ExtManagementSystem", :method_name => "authentication_check_schedule")
+    queue_work_on_each_zone(:class_name  => "ExtManagementSystem", :method_name => "authentication_check_schedule", :priority => MiqQueue::HIGH_PRIORITY)
   end
 
   def session_check_session_timeout
@@ -95,6 +95,10 @@ class MiqScheduleWorker::Jobs
     queue_work(:class_name => "EventStream", :method_name => "purge_timer", :zone => nil)
   end
 
+  def notification_purge_timer
+    queue_work(:class_name => "Notification", :method_name => "purge_timer", :zone => nil)
+  end
+
   def policy_event_purge_timer
     queue_work(:class_name => "PolicyEvent", :method_name => "purge_timer", :zone => nil)
   end
@@ -109,18 +113,20 @@ class MiqScheduleWorker::Jobs
     queue_work(:class_name => "ContainerGroup", :method_name => "purge_timer", :zone => nil)
     queue_work(:class_name => "ContainerImage", :method_name => "purge_timer", :zone => nil)
     queue_work(:class_name => "ContainerProject", :method_name => "purge_timer", :zone => nil)
+    queue_work(:class_name => "ContainerQuota", :method_name => "purge_timer", :zone => nil)
+    queue_work(:class_name => "ContainerQuotaItem", :method_name => "purge_timer", :zone => nil)
   end
 
   def binary_blob_purge_timer
     queue_work(:class_name => "BinaryBlob", :method_name => "purge_timer", :zone => nil)
   end
 
-  def miq_schedule_queue_scheduled_work(schedule_id, rufus_job)
-    MiqSchedule.queue_scheduled_work(schedule_id, rufus_job.job_id, rufus_job.next_time.to_i, rufus_job.opts)
+  def vim_performance_states_purge_timer
+    queue_work(:class_name => "VimPerformanceState", :method_name => "purge_timer", :zone => nil)
   end
 
-  def ldap_server_sync_data_from_timer
-    queue_work(:class_name => "LdapServer", :method_name => "sync_data_from_timer")
+  def miq_schedule_queue_scheduled_work(schedule_id, rufus_job)
+    MiqSchedule.queue_scheduled_work(schedule_id, rufus_job.job_id, rufus_job.next_time.to_i, rufus_job.opts)
   end
 
   def vmdb_database_capture_metrics_timer
@@ -136,6 +142,18 @@ class MiqScheduleWorker::Jobs
   def metric_purge_all_timer
     ["VmdbDatabaseMetric", "VmdbMetric"].each do |class_name|
       queue_work(:class_name  => class_name, :method_name => "purge_all_timer", :role => "database_operations", :zone => nil)
+    end
+  end
+
+  def database_maintenance_reindex_timer
+    ::Settings.database.maintenance.reindex_tables.each do |class_name|
+      queue_work(:class_name => class_name, :method_name => "reindex", :role => "database_operations", :zone => nil)
+    end
+  end
+
+  def database_maintenance_vacuum_timer
+    ::Settings.database.maintenance.vacuum_tables.each do |class_name|
+      queue_work(:class_name => class_name, :method_name => "vacuum", :role => "database_operations", :zone => nil)
     end
   end
 

@@ -75,7 +75,10 @@ describe ManageIQ::Providers::CloudManager::ProvisionWorkflow do
       FactoryGirl.create(:classification_cost_center_with_tags)
       admin.current_group.entitlement = Entitlement.create!(:filters => {'managed'   => [['/managed/cc/001']],
                                                                          'belongsto' => []})
-
+      2.times do |i|
+        kp = ManageIQ::Providers::CloudManager::AuthKeyPair.create(:name => "auth_#{i}")
+        ems.key_pairs << kp
+      end
       2.times { FactoryGirl.create(:availability_zone, :ems_id => ems.id) }
       2.times do
         FactoryGirl.create(:security_group, :name                  => "sgb_1",
@@ -85,11 +88,23 @@ describe ManageIQ::Providers::CloudManager::ProvisionWorkflow do
                                         :supports_64_bit => true)
       ems.flavors << FactoryGirl.create(:flavor, :name => "m1.large", :supports_32_bit => false,
                                         :supports_64_bit => true)
-
+      tagged_key_pair = ems.key_pairs.first
       tagged_zone = ems.availability_zones.first
       tagged_flavor = ems.flavors.first
       Classification.classify(tagged_zone, 'cc', '001')
       Classification.classify(tagged_flavor, 'cc', '001')
+      Classification.classify(tagged_key_pair, 'cc', '001')
+    end
+
+    context "key_pairs" do
+      it "#get_targets_for_ems" do
+        expect(ems.key_pairs.size).to eq(2)
+        expect(ems.key_pairs.first.tags.size).to eq(1)
+        expect(ems.key_pairs.last.tags.size).to eq(0)
+        filtered = workflow.send(:get_targets_for_ems, ems, :cloud_filter, ManageIQ::Providers::CloudManager::AuthKeyPair,
+                                 'key_pairs')
+        expect(filtered.size).to eq(1)
+      end
     end
 
     context "availability_zones" do
@@ -110,7 +125,7 @@ describe ManageIQ::Providers::CloudManager::ProvisionWorkflow do
       @az2 = FactoryGirl.create(:availability_zone, :ext_management_system => ems)
       @az3 = FactoryGirl.create(:availability_zone, :ext_management_system => ems)
 
-      @cn1 = FactoryGirl.create(:cloud_network, :ext_management_system => ems.network_manager)
+      @cn1 = FactoryGirl.create(:cloud_network, :ext_management_system => ems.network_manager, :cidr => "10.0.0./8")
 
       @cs1 = FactoryGirl.create(:cloud_subnet, :cloud_network         => @cn1,
                                                :availability_zone     => @az1,
@@ -134,7 +149,7 @@ describe ManageIQ::Providers::CloudManager::ProvisionWorkflow do
       it "with a zone" do
         workflow.values[:placement_availability_zone] = [@az1.id, @az1.name]
         expect(workflow.allowed_cloud_networks.length).to eq(1)
-        expect(workflow.allowed_cloud_networks).to eq(@cn1.id => @cn1.name)
+        expect(workflow.allowed_cloud_networks).to eq(@cn1.id => "#{@cn1.name} (#{@cn1.cidr})")
       end
     end
 

@@ -11,6 +11,21 @@ class Chargeback < ActsAsArModel
     :fixed_compute_metric => :integer,
   )
 
+  def self.dynamic_rate_columns
+    @chargeable_fields = {}
+    @chargeable_fields[self.class] ||=
+      begin
+        ChargeableField.all.each_with_object({}) do |chargeable_field, result|
+          next unless report_col_options.keys.include?("#{chargeable_field.rate_name}_cost")
+          result["#{chargeable_field.rate_name}_rate"] = :string
+        end
+      end
+  end
+
+  def self.refresh_dynamic_metric_columns
+    set_columns_hash(dynamic_rate_columns)
+  end
+
   def self.build_results_for_report_chargeback(options)
     _log.info("Calculating chargeback costs...")
     @options = options = ReportOptions.new_from_h(options)
@@ -46,6 +61,9 @@ class Chargeback < ActsAsArModel
       "#{classification_id}_#{ts_key}"
     elsif @options[:groupby_label].present?
       "#{groupby_label_value(consumption, @options[:groupby_label])}_#{ts_key}"
+    elsif @options.group_by_tenant?
+      tenant = @options.tenant_for(consumption)
+      "#{tenant ? tenant.id : 'none'}_#{ts_key}"
     else
       default_key(consumption, ts_key)
     end
@@ -75,6 +93,7 @@ class Chargeback < ActsAsArModel
     self.interval_name = options.interval
     self.chargeback_rates = ''
     self.entity ||= consumption.resource
+    self.tenant_name = consumption.resource.try(:tenant).try(:name) if options.group_by_tenant?
   end
 
   def showback_category
@@ -136,7 +155,7 @@ class Chargeback < ActsAsArModel
       rate.rate_details_relevant_to(relevant_fields).each do |r|
         r.charge(relevant_fields, consumption, @options).each do |field, value|
           next unless self.class.attribute_names.include?(field)
-          self[field] = (self[field] || 0) + value
+          self[field] = self[field].kind_of?(Numeric) ? (self[field] || 0) + value : value
         end
       end
     end
@@ -164,6 +183,7 @@ class Chargeback < ActsAsArModel
     static_cols       = group_by == "project" ? report_static_cols - ["image_name"] : report_static_cols
     static_cols       = group_by == "tag" ? [report_tag_field] : static_cols
     static_cols       = group_by == "label" ? [report_label_field] : static_cols
+    static_cols       = group_by == "tenant" ? ['tenant_name'] : static_cols
     rpt.cols         += static_cols
     rpt.col_order     = static_cols + ["display_range"]
     rpt.sortby        = static_cols + ["start_date"]

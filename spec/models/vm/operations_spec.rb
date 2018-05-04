@@ -1,5 +1,5 @@
 describe 'VM::Operations' do
-  before(:each) do
+  before do
     @miq_server = EvmSpecHelper.local_miq_server
     @ems        = FactoryGirl.create(:ems_vmware, :zone => @miq_server.zone)
     @vm         = FactoryGirl.create(:vm_vmware, :ems_id => @ems.id)
@@ -25,7 +25,7 @@ describe 'VM::Operations' do
     end
 
     context 'cloud providers' do
-      before(:each) { @ipaddresses = %w(10.10.1.121 35.190.140.48) }
+      before { @ipaddresses = %w(10.10.1.121 35.190.140.48) }
       it 'returns the public ipv4 address for AWS' do
         ems = FactoryGirl.create(:ems_google, :project => 'manageiq-dev')
         az  = FactoryGirl.create(:availability_zone_google)
@@ -106,6 +106,14 @@ describe 'VM::Operations' do
     before do
       @ems_double = double
       allow(@vm).to receive(:ext_management_system).and_return(@ems_double)
+    end
+
+    it 'returns the correct error message if the vm vendor is vmware and it does not have an ext_management_system' do
+      allow(@vm).to receive(:ext_management_system).and_return(nil)
+      allow(@vm).to receive(:power_state).and_return('off')
+
+      expect(@vm.supports_launch_vnc_console?).to be_falsey
+      expect(@vm.unsupported_reason(:launch_vnc_console)).to include('the VM is not powered on')
     end
 
     it 'does not support if vendor is vmware and api version is >= 6.5' do

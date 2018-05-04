@@ -31,7 +31,12 @@ class MiqServer < ApplicationRecord
 
   virtual_column :zone_description, :type => :string
 
+  default_value_for(:name, "EVM")
+  default_value_for(:zone) { Zone.default_zone }
+
+  scope :active_miq_servers, -> { where(:status => STATUSES_ACTIVE) }
   scope :with_zone_id, ->(zone_id) { where(:zone_id => zone_id) }
+  delegate :description, :to => :zone, :prefix => true
 
   STATUS_STARTING       = 'starting'.freeze
   STATUS_STARTED        = 'started'.freeze
@@ -47,8 +52,9 @@ class MiqServer < ApplicationRecord
 
   RESTART_EXIT_STATUS = 123
 
-  def self.active_miq_servers
-    where(:status => STATUSES_ACTIVE)
+  def hostname
+    h = super
+    h if h.to_s.hostname?
   end
 
   def starting_server_record
@@ -176,7 +182,7 @@ class MiqServer < ApplicationRecord
       server_hash[:ipaddress] = config_hash[:host] = ipaddr
     end
 
-    unless hostname.blank?
+    if hostname.present? && hostname.hostname?
       hostname = nil if hostname =~ /.*localhost.*/
       server_hash[:hostname] = config_hash[:hostname] = hostname
     end
@@ -499,10 +505,6 @@ class MiqServer < ApplicationRecord
     true
   end
 
-  def state
-    "on"
-  end
-
   def started?
     status == "started"
   end
@@ -551,10 +553,6 @@ class MiqServer < ApplicationRecord
     my_server(force_reload).my_zone
   end
 
-  def zone_description
-    zone.try(:description)
-  end
-
   def self.my_roles(force_reload = false)
     my_server(force_reload).my_roles
   end
@@ -583,33 +581,20 @@ class MiqServer < ApplicationRecord
     my_zone == zone_name
   end
 
-  CONDITION_CURRENT = {:status => ["starting", "started"]}
-  def self.find_started_in_my_region
-    in_my_region.where(CONDITION_CURRENT)
-  end
-
-  def self.find_all_started_servers
-    where(CONDITION_CURRENT)
-  end
-
   def find_other_started_servers_in_region
-    MiqRegion.my_region.active_miq_servers.to_a.delete_if { |s| s.id == id }
+    self.class.active_miq_servers.in_my_region.where.not(:id => id).to_a
   end
 
   def find_other_servers_in_region
-    MiqRegion.my_region.miq_servers.to_a.delete_if { |s| s.id == id }
+    self.class.active_miq_servers.where.not(:id => id).to_a
   end
 
   def find_other_started_servers_in_zone
-    zone.active_miq_servers.to_a.delete_if { |s| s.id == id }
+    self.class.active_miq_servers.where(:zone_id => zone_id).where.not(:id => id).to_a
   end
 
   def find_other_servers_in_zone
-    zone.miq_servers.to_a.delete_if { |s| s.id == id }
-  end
-
-  def log_prefix
-    @log_prefix ||= "MIQ(#{self.class.name})"
+    self.class.where(:zone_id => zone_id).where.not(:id => id).to_a
   end
 
   def display_name

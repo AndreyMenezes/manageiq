@@ -109,16 +109,6 @@
   :expires_in: 24.hours
   :level: :error
   :audience: superadmin
-- :name: mw_op_success
-  :message: 'The operation %{op_name} %{op_arg} on %{mw_server} completed successfully.'
-  :expires_in: 24.hours
-  :level: :success
-  :audience: global
-- :name: mw_op_failure
-  :message: 'The operation %{op_name} %{op_arg} on %{mw_server} has failed to complete. Please check the logs for further details.'
-  :expires_in: 24.hours
-  :level: :warning
-  :audience: global
 - :name: role_activate_success
   :message: 'The role %{role_name} has been activated on server %{server_name}'
   :expires_in: 24.hours
@@ -264,3 +254,18 @@
   :expires_in: 24.hours
   :level: :error
   :audience: global
+- :name: cloud_tenant_delete_success
+  :message: 'Deleting Cloud Tenant %{subject} completed successfully.'
+  :expires_in: 24.hours
+  :level: success
+  :audience: global
+- :name: cloud_tenant_delete_error
+  :message: 'Deleting Cloud Tenant %{subject} failed: %{error_message}'
+  :expires_in: 24.hours
+  :level: error
+  :audience: global
+- :name: server_registration_error
+  :message: 'Registration failed for server %{server_name}'
+  :expires_in: 24.hours
+  :level: :error
+  :audience: superadmin

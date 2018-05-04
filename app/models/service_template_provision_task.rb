@@ -98,7 +98,7 @@ class ServiceTemplateProvisionTask < MiqRequestTask
       :instance_id    => id,
       :method_name    => "do_post_provision",
       :deliver_on     => 1.minutes.from_now.utc,
-      :tracking_label => "#{self.class.name.underscore}_#{id}",
+      :tracking_label => tracking_label_id,
       :miq_callback   => {:class_name => self.class.name, :instance_id => id, :method_name => :execute_callback}
     )
   end
@@ -128,7 +128,7 @@ class ServiceTemplateProvisionTask < MiqRequestTask
       }
 
       # Automate entry point overrides from the resource_action
-      ra = source.resource_actions.detect { |ra| ra.action == 'Provision' } if source.respond_to?(:resource_actions)
+      ra = resource_action
 
       unless ra.nil?
         args[:namespace]        = ra.ae_namespace unless ra.ae_namespace.blank?
@@ -138,7 +138,7 @@ class ServiceTemplateProvisionTask < MiqRequestTask
         args[:attrs].merge!(ra.ae_attributes)
       end
 
-      args[:attrs].merge!(MiqAeEngine.create_automation_attributes(destination.class.base_model.name => destination))
+      args[:attrs].merge!(MiqAeEngine.create_automation_attributes(destination.class.base_model.name => destination)) if destination.present?
       args[:user_id]      = get_user.id
       args[:miq_group_id] = get_user.current_group.id
       args[:tenant_id]    = get_user.current_tenant.id
@@ -150,12 +150,16 @@ class ServiceTemplateProvisionTask < MiqRequestTask
         :args           => [args],
         :role           => 'automate',
         :zone           => options.fetch(:miq_zone, zone),
-        :tracking_label => "#{self.class.name.underscore}_#{id}"
+        :tracking_label => tracking_label_id
       )
       update_and_notify_parent(:state => "pending", :status => "Ok",  :message => "Automation Starting")
     else
       execute_queue
     end
+  end
+
+  def resource_action
+    source.resource_actions.detect { |ra| ra.action == 'Provision' } if source.respond_to?(:resource_actions)
   end
 
   def service_resource
@@ -197,7 +201,7 @@ class ServiceTemplateProvisionTask < MiqRequestTask
   def update_and_notify_parent(*args)
     prev_state = state
     super
-    task_finished if state == "finished" && prev_state != "finished"
+    try("task_#{state}") if prev_state != state
   end
 
   def task_finished

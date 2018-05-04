@@ -5,9 +5,86 @@ describe VmOrTemplate do
   let(:ems)     { FactoryGirl.create(:ext_management_system) }
   let(:storage) { FactoryGirl.create(:storage) }
 
+  # Basically these specs are a truth table for the #registered? method, but
+  # need it to verify functionality when converting these to scopes
+  describe "being registered" do
+    subject                { FactoryGirl.create(:vm_or_template, attrs) }
+    let(:host)             { FactoryGirl.create(:host) }
+    let(:registered_vms)   { described_class.registered.to_a }
+    let(:unregistered_vms) { described_class.unregistered.to_a }
+
+    # Preloads subject so that the registered_vms and unregistered_vms specs
+    # have it available to query against.
+    before { subject }
+
+    context "with attrs of template => false, ems_id => nil, host_id => nil" do
+      let(:attrs) { { :template => false, :ems_id => nil, :host_id => nil } }
+
+      it("is not #registered?")        { expect(subject.registered?).to be false }
+      it("is not in registered_vms")   { expect(registered_vms).to_not include subject }
+      it("is in unregistered_vms")     { expect(unregistered_vms).to include subject }
+    end
+
+    context "with attrs template => false, ems_id => nil, host_id => [ID]" do
+      let(:attrs) { { :template => false, :ems_id => nil, :host_id => host.id } }
+
+      it("is #registered?")            { expect(subject.registered?).to be true }
+      it("is in registered_vms")       { expect(registered_vms).to include subject }
+      it("is not in unregistered_vms") { expect(unregistered_vms).to_not include subject }
+    end
+
+    context "with attrs template => false, ems_id => [ID], host_id => nil" do
+      let(:attrs) { { :template => false, :ems_id => ems.id, :host_id => nil } }
+
+      it("is not #registered?")        { expect(subject.registered?).to be false }
+      it("is not in registered_vms")   { expect(registered_vms).to_not include subject }
+      it("is in unregistered_vms")     { expect(unregistered_vms).to include subject }
+    end
+
+    context "with attrs template => false, ems_id => [ID], host_id => [ID]" do
+      let(:attrs) { { :template => false, :ems_id => ems.id, :host_id => host.id } }
+
+      it("is #registered?")            { expect(subject.registered?).to be true }
+      it("is in registered_vms")       { expect(registered_vms).to include subject }
+      it("is not in unregistered_vms") { expect(unregistered_vms).to_not include subject }
+    end
+
+    context "with attrs template => true, ems_id => nil, host_id => nil" do
+      let(:attrs) { { :template => true, :ems_id => nil, :host_id => nil } }
+
+      it("is not #registered?")        { expect(subject.registered?).to be false }
+      it("is not in registered_vms")   { expect(registered_vms).to_not include subject }
+      it("is in unregistered_vms")     { expect(unregistered_vms).to include subject }
+    end
+
+    context "with attrs if template => true, ems_id => nil, host_id => [ID]" do
+      let(:attrs) { { :template => true, :ems_id => nil, :host_id => host.id } }
+
+      it("is not #registered?")        { expect(subject.registered?).to be false }
+      it("is not in registered_vms")   { expect(registered_vms).to_not include subject }
+      it("is in unregistered_vms")     { expect(unregistered_vms).to include subject }
+    end
+
+    context "with attrs if template => true, ems_id => [ID], host_id => nil" do
+      let(:attrs) { { :template => true, :ems_id => ems.id, :host_id => nil } }
+
+      it("is not #registered?")        { expect(subject.registered?).to be false }
+      it("is not in registered_vms")   { expect(registered_vms).to_not include subject }
+      it("is in unregistered_vms")     { expect(unregistered_vms).to include subject }
+    end
+
+    context "with attrs if template => true, ems_id => [ID], host_id => [ID]" do
+      let(:attrs) { { :template => true, :ems_id => ems.id, :host_id => host.id } }
+
+      it("is #registered?")            { expect(subject.registered?).to be true }
+      it("is in registered_vms")       { expect(registered_vms).to include subject }
+      it("is not in unregistered_vms") { expect(unregistered_vms).to_not include subject }
+    end
+  end
+
   context ".event_by_property" do
     context "should add an EMS event" do
-      before(:each) do
+      before do
         Timecop.freeze(Time.now)
 
         @host            = FactoryGirl.create(:host,      :name  => "host")
@@ -17,7 +94,7 @@ describe VmOrTemplate do
         @event_timestamp = Time.now.utc
       end
 
-      after(:each) do
+      after do
         Timecop.return
       end
 
@@ -46,7 +123,7 @@ describe VmOrTemplate do
   end
 
   context "#add_ems_event" do
-    before(:each) do
+    before do
       @host            = FactoryGirl.create(:host, :name => "host 1")
       @vm              = FactoryGirl.create(:vm_vmware, :name => "vm 1", :location => "/local/path", :host => @host, :uid_ems => "1", :ems_id => 101)
       @event_type      = "foo"
@@ -61,7 +138,7 @@ describe VmOrTemplate do
     end
 
     context "should add an EMS Event" do
-      before(:each) do
+      before do
         @ipaddress       = "192.268.20.1"
         @hardware        = FactoryGirl.create(:hardware, :vm_or_template_id => @vm.id)
         @network         = FactoryGirl.create(:network,  :hardware_id       => @hardware.id, :ipaddress => @ipaddress)
@@ -457,7 +534,7 @@ describe VmOrTemplate do
 
   context "#supports_terminate?" do
     let(:ems_does_vm_destroy) { FactoryGirl.create(:ems_vmware) }
-    let(:ems_doesnot_vm_destroy) { FactoryGirl.create(:ems_vmware_cloud) }
+    let(:ems_doesnot_vm_destroy) { FactoryGirl.create(:ems_cloud) }
     let(:host) { FactoryGirl.create(:host) }
 
     it "returns true for a VM not terminated" do
@@ -576,6 +653,32 @@ describe VmOrTemplate do
     template.miq_provisions_from_template << provision
 
     expect(template.miq_provision_vms.collect(&:id)).to eq([vm.id])
+  end
+
+  describe "#miq_provision_template" do
+    it "links vm to template" do
+      ems       = FactoryGirl.create(:ems_vmware_with_authentication)
+      template  = FactoryGirl.create(:template_vmware, :ext_management_system => ems)
+      vm        = FactoryGirl.create(:vm_vmware, :ext_management_system => ems)
+
+      options = {
+        :vm_name        => vm.name,
+        :vm_target_name => vm.name,
+        :src_vm_id      => [template.id, template.name]
+      }
+
+      FactoryGirl.create(
+        :miq_provision_vmware,
+        :destination  => vm,
+        :source       => template,
+        :request_type => 'clone_to_vm',
+        :state        => 'finished',
+        :status       => 'Ok',
+        :options      => options
+      )
+
+      expect(vm.miq_provision_template).to eq(template)
+    end
   end
 
   describe ".v_pct_free_disk_space (delegated to hardware)" do
@@ -1135,6 +1238,29 @@ describe VmOrTemplate do
         :instance_id => vm_blue2.id,
         :method_name => "classify_with_parent_folder_path"
       )
+    end
+  end
+
+  context "#v_datastore_path" do
+    it "with no location or storage" do
+      expect(Vm.new.v_datastore_path).to eq("")
+    end
+
+    it "with location but no storage" do
+      expect(Vm.new(:location => "test location").v_datastore_path).to eq("test location")
+    end
+
+    it "with location and storage" do
+      storage = Storage.new(:name => "storage name")
+      expect(Vm.new(:location => "test location", :storage => storage).v_datastore_path).to eq("storage name/test location")
+    end
+  end
+
+  context "#policy_events" do
+    it "returns the policy events with target class of VmOrTemplate and target_id of the vm" do
+      policy_event = FactoryGirl.create(:policy_event, :target_class => "VmOrTemplate", :target_id => vm.id)
+
+      expect(vm.policy_events).to eq([policy_event])
     end
   end
 end

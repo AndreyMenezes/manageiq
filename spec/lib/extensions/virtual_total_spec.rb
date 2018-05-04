@@ -1,5 +1,5 @@
 describe VirtualTotal do
-  before(:each) do
+  before do
     # rubocop:disable Style/SingleLineMethods, Layout/EmptyLineBetweenDefs, Naming/AccessorMethodName
     class VitualTotalTestBase < ActiveRecord::Base
       self.abstract_class = true
@@ -71,7 +71,7 @@ describe VirtualTotal do
     # rubocop:enable Style/SingleLineMethods, Layout/EmptyLineBetweenDefs, Naming/AccessorMethodName
   end
 
-  after(:each) do
+  after do
     VitualTotalTestBase.remove_connection
     Object.send(:remove_const, :VtAuthor)
     Object.send(:remove_const, :VtBook)
@@ -160,7 +160,7 @@ describe VirtualTotal do
     end
 
     context "with order clauses in the relation" do
-      before(:each) do
+      before do
         # Monkey patching VtAuthor for these specs
         class VtAuthor < VitualTotalTestBase
           has_many :recently_published_books, -> { published.order(:created_on => :desc) },
@@ -217,7 +217,7 @@ describe VirtualTotal do
     end
 
     context "with a special books class" do
-      before(:each) do
+      before do
         class SpecialVtBook < VtBook
           default_scope { where(:special => true) }
 
@@ -236,7 +236,7 @@ describe VirtualTotal do
         end
       end
 
-      after(:each) do
+      after do
         Object.send(:remove_const, :SpecialVtBook)
       end
 
@@ -362,21 +362,23 @@ describe VirtualTotal do
     end
   end
 
-  describe ".virtual_total (with through relation (host#v_total_storages)" do
-    let(:base_model) { Host }
+  describe ".virtual_total (with through relation (ems#total_storages)" do
+    let(:base_model) { ExtManagementSystem }
 
     it "calculates totals locally" do
-      expect(model_with_children(0).v_total_storages).to eq(0)
-      expect(model_with_children(2).v_total_storages).to eq(2)
+      expect(model_with_children(0).total_storages).to eq(0)
+      expect(model_with_children(2).total_storages).to eq(2)
     end
 
     it "is not defined in sql" do
-      expect(base_model.attribute_supported_by_sql?(:v_total_storages)).to be(false)
+      expect(base_model.attribute_supported_by_sql?(:total_storages)).to be(false)
     end
 
     def model_with_children(count)
-      FactoryGirl.create(:host).tap do |host|
-        count.times { host.storages.create(FactoryGirl.attributes_for(:storage)) }
+      FactoryGirl.create(:ext_management_system).tap do |ems|
+        ems.hosts.create(FactoryGirl.attributes_for(:host)).tap do |host|
+          count.times { host.storages.create(FactoryGirl.attributes_for(:storage)) }
+        end
       end.reload
     end
   end
@@ -409,7 +411,7 @@ describe VirtualTotal do
 
       def model_with_children(count)
         FactoryGirl.create(:vm_vmware, :hardware => FactoryGirl.create(:hardware)).tap do |vm|
-          count.times { vm.hardware.disks.create(FactoryGirl.attributes_for(:disk, :size => 10.0)) }
+          count.times { vm.hardware.disks.create(:size => 10.0) }
         end.reload
       end
     end

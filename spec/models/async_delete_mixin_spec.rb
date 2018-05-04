@@ -102,12 +102,12 @@ describe AsyncDeleteMixin do
   end
 
   context "with zone and server" do
-    before(:each) do
+    before do
       EvmSpecHelper.local_miq_server
     end
 
     context "with 3 ems clusters" do
-      before(:each) do
+      before do
         @objects, @obj = common_setup(:ems_cluster)
       end
 
@@ -123,14 +123,14 @@ describe AsyncDeleteMixin do
     end
 
     context "with 3 ems" do
-      before(:each) do
+      before do
         @objects, @obj = common_setup(:ems_vmware)
       end
 
       should_define_destroy_queue_instance_method
       should_define_destroy_queue_class_method
-      should_queue_destroy_on_instance("orchestrate_destroy")
-      should_queue_destroy_on_class_with_many_ids("orchestrate_destroy")
+      should_queue_destroy_on_instance
+      should_queue_destroy_on_class_with_many_ids
 
       should_define_delete_queue_instance_method
       should_define_delete_queue_class_method
@@ -139,7 +139,7 @@ describe AsyncDeleteMixin do
     end
 
     context "with 3 hosts" do
-      before(:each) do
+      before do
         @objects, @obj = common_setup(:host)
       end
 
@@ -155,7 +155,7 @@ describe AsyncDeleteMixin do
     end
 
     context "with 3 resource pools" do
-      before(:each) do
+      before do
         @objects, @obj = common_setup(:resource_pool)
       end
 
@@ -171,7 +171,7 @@ describe AsyncDeleteMixin do
     end
 
     context "with 3 storages" do
-      before(:each) do
+      before do
         @objects, @obj = common_setup(:storage)
       end
 

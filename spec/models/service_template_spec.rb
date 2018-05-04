@@ -45,9 +45,10 @@ describe ServiceTemplate do
     end
 
     it "does not show hidden buttons" do
-      service_template = FactoryGirl.create(:service_template, :name => "foo")
-      true_expression = MiqExpression.new("=" => {"field" => "ServiceTemplate-name", "value" => "foo"})
-      false_expression = MiqExpression.new("=" => {"field" => "ServiceTemplate-name", "value" => "bar"})
+      service_template = FactoryGirl.create(:service_template)
+      service = FactoryGirl.create(:service, :name => "foo", :service_template => service_template)
+      true_expression = MiqExpression.new("=" => {"field" => "Service-name", "value" => "foo"})
+      false_expression = MiqExpression.new("=" => {"field" => "Service-name", "value" => "labar"})
       FactoryGirl.create(:custom_button,
                          :name                  => "visible button",
                          :applies_to_class      => "Service",
@@ -79,13 +80,73 @@ describe ServiceTemplate do
           )
         ]
       }
-      expect(service_template.custom_actions).to match(expected)
+      expect(service_template.custom_actions(service)).to match(expected)
+    end
+
+    context "expression evaluation" do
+      let(:service_template) { FactoryGirl.create(:service_template, :prov_type=> "vmware") }
+      let(:service) { FactoryGirl.create(:service, :name => "foo", :service_template => service_template) }
+      let(:true_expression_on_template) do
+        MiqExpression.new("=" => {"field" => "ServiceTemplate-prov_type", "value" => "vmware"})
+      end
+      let(:false_expression_on_template) do
+        MiqExpression.new("=" => {"field" => "ServiceTemplate-prov_type", "value" => "not_vmware"})
+      end
+      let(:true_expression_on_service) do
+        MiqExpression.new("=" => {"field" => "Service-name", "value" => "foo"})
+      end
+      let(:false_expression_on_service) do
+        MiqExpression.new("=" => {"field" => "Service-name", "value" => "not_foo"})
+      end
+
+      before do
+        FactoryGirl.create(:custom_button,
+                           :name                  => "visible button on service",
+                           :applies_to_class      => "Service",
+                           :visibility_expression => true_expression_on_service)
+        FactoryGirl.create(:custom_button,
+                           :name                  => "hidden button on service",
+                           :applies_to_class      => "Service",
+                           :visibility_expression => false_expression_on_service)
+        FactoryGirl.create(:custom_button,
+                           :name                  => "visible button on template",
+                           :applies_to_class      => "ServiceTemplate",
+                           :applies_to_id         => service_template.id,
+                           :visibility_expression => true_expression_on_template)
+        FactoryGirl.create(:custom_button,
+                           :name                  => "hidden visible button on template",
+                           :applies_to_class      => "ServiceTemplate",
+                           :applies_to_id         => service_template.id,
+                           :visibility_expression => false_expression_on_template)
+      end
+
+      it "uses ServiceTemplate object to evaluate expression defined on Service Template if no parameter passed" do
+        expected = {
+          :buttons       => [
+            a_hash_including("name" => "visible button on template")
+          ],
+          :button_groups => []
+        }
+        expect(service_template.custom_actions).to match(expected)
+      end
+
+      it "uses passed object for expression defined on that object and ServiceTemplate for expression on template" do
+        expected = {
+          :buttons       => a_collection_containing_exactly(
+            a_hash_including("name" => "visible button on service"),
+            a_hash_including("name" => "visible button on template")
+          ),
+          :button_groups => []
+        }
+        expect(service_template.custom_actions(service)).to match(expected)
+      end
     end
 
     it "serializes the enablement" do
       service_template = FactoryGirl.create(:service_template, :name => "foo")
-      true_expression = MiqExpression.new("=" => {"field" => "ServiceTemplate-name", "value" => "foo"})
-      false_expression = MiqExpression.new("=" => {"field" => "ServiceTemplate-name", "value" => "bar"})
+      service = FactoryGirl.create(:service, :name => "bar", :service_template => service_template)
+      true_expression = MiqExpression.new("=" => {"field" => "Service-name", "value" => "bar"})
+      false_expression = MiqExpression.new("=" => {"field" => "Service-name", "value" => "foo"})
       FactoryGirl.create(:custom_button,
                          :name                  => "enabled button",
                          :applies_to_class      => "Service",
@@ -119,7 +180,7 @@ describe ServiceTemplate do
           )
         ]
       }
-      expect(service_template.custom_actions).to match(expected)
+      expect(service_template.custom_actions(service)).to match(expected)
     end
   end
 
@@ -129,18 +190,22 @@ describe ServiceTemplate do
       true_expression = MiqExpression.new("=" => {"field" => "ServiceTemplate-name", "value" => "foo"})
       false_expression = MiqExpression.new("=" => {"field" => "ServiceTemplate-name", "value" => "bar"})
       visible_button = FactoryGirl.create(:custom_button,
-                                          :applies_to_class      => "Service",
+                                          :applies_to_class      => "ServiceTemplate",
+                                          :applies_to_id         => service_template.id,
                                           :visibility_expression => true_expression)
       _hidden_button = FactoryGirl.create(:custom_button,
-                                          :applies_to_class      => "Service",
+                                          :applies_to_class      => "ServiceTemplate",
+                                          :applies_to_id         => service_template.id,
                                           :visibility_expression => false_expression)
       visible_button_in_group = FactoryGirl.create(:custom_button,
-                                                   :applies_to_class      => "Service",
+                                                   :applies_to_class      => "ServiceTemplate",
+                                                   :applies_to_id         => service_template.id,
                                                    :visibility_expression => true_expression)
       hidden_button_in_group = FactoryGirl.create(:custom_button,
-                                                  :applies_to_class      => "Service",
+                                                  :applies_to_class      => "ServiceTemplate",
+                                                  :applies_to_id         => service_template.id,
                                                   :visibility_expression => false_expression)
-      FactoryGirl.create(:custom_button_set).tap do |group|
+      service_template.custom_button_sets << FactoryGirl.create(:custom_button_set).tap do |group|
         group.add_member(visible_button_in_group)
         group.add_member(hidden_button_in_group)
       end
@@ -150,7 +215,7 @@ describe ServiceTemplate do
   end
 
   context "#type_display" do
-    before(:each) do
+    before do
       @st1 = FactoryGirl.create(:service_template, :name => 'Service Template 1')
     end
 
@@ -170,7 +235,7 @@ describe ServiceTemplate do
   end
 
   context "#atomic?" do
-    before(:each) do
+    before do
       @st1 = FactoryGirl.create(:service_template)
     end
 
@@ -185,7 +250,7 @@ describe ServiceTemplate do
   end
 
   context "#composite?" do
-    before(:each) do
+    before do
       @st1 = FactoryGirl.create(:service_template)
     end
 
@@ -222,7 +287,7 @@ describe ServiceTemplate do
   end
 
   context "with multiple services" do
-    before(:each) do
+    before do
       @svc_a = FactoryGirl.create(:service_template, :name => 'Svc A')
       @svc_b = FactoryGirl.create(:service_template, :name => 'Svc B')
       @svc_c = FactoryGirl.create(:service_template, :name => 'Svc C')
@@ -364,7 +429,7 @@ describe ServiceTemplate do
   end
 
   context "with a small env" do
-    before(:each) do
+    before do
       @zone1 = FactoryGirl.create(:small_environment)
       allow(MiqServer).to receive(:my_server).and_return(@zone1.miq_servers.first)
       @st1 = FactoryGirl.create(:service_template, :name => 'Service Template 1')
@@ -417,7 +482,7 @@ describe ServiceTemplate do
     end
 
     context "with a VM Provision Request Template" do
-      before(:each) do
+      before do
         admin = FactoryGirl.create(:user_admin)
 
         vm_template = Vm.first

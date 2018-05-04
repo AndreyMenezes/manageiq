@@ -13,15 +13,18 @@ class MiqGroup < ApplicationRecord
   has_many   :miq_report_results, :dependent => :nullify
   has_many   :miq_widget_contents, :dependent => :destroy
   has_many   :miq_widget_sets, :as => :owner, :dependent => :destroy
+  has_many   :miq_product_features, :through => :miq_user_role
 
   virtual_column :miq_user_role_name, :type => :string,  :uses => :miq_user_role
   virtual_column :read_only,          :type => :boolean
+  virtual_has_one :sui_product_features, :class_name => "Array"
 
   delegate :self_service?, :limited_self_service?, :disallowed_roles, :to => :miq_user_role, :allow_nil => true
 
-  validates :description, :presence => true, :unique_within_region => true
+  validates :description, :presence => true, :unique_within_region => { :match_case => false }
   validate :validate_default_tenant, :on => :update, :if => :tenant_id_changed?
   before_destroy :ensure_can_be_destroyed
+  after_destroy :reset_current_group_for_users
 
   # For REST API compatibility only; Don't use otherwise!
   accepts_nested_attributes_for :entitlement
@@ -132,7 +135,7 @@ class MiqGroup < ApplicationRecord
   end
 
   def self.get_httpd_groups_by_user(user)
-    if MiqEnvironment::Command.is_container?
+    if MiqEnvironment::Command.is_podified?
       get_httpd_groups_by_user_via_dbus_api_service(user)
     else
       get_httpd_groups_by_user_via_dbus(user)
@@ -248,8 +251,8 @@ class MiqGroup < ApplicationRecord
     in_my_region.non_tenant_groups
   end
 
-  def self.with_current_user_groups
-    current_user = User.current_user
+  def self.with_current_user_groups(user = nil)
+    current_user = user || User.current_user
     current_user.admin_user? ? all : where(:id => current_user.miq_group_ids)
   end
 
@@ -257,6 +260,13 @@ class MiqGroup < ApplicationRecord
     group_user_ids = user_ids
     return false if group_user_ids.empty?
     users.includes(:miq_groups).where(:id => group_user_ids).where.not(:miq_groups => {:id => id}).count != group_user_ids.size
+  end
+
+  def sui_product_features
+    return [] unless miq_user_role.allows?(:identifier => 'sui')
+    MiqProductFeature.feature_all_children('sui').each_with_object([]) do |sui_feature, sui_features|
+      sui_features << sui_feature if miq_user_role.allows?(:identifier => sui_feature)
+    end
   end
 
   private
@@ -278,5 +288,9 @@ class MiqGroup < ApplicationRecord
     raise _("The group has users assigned that do not belong to any other group") if single_group_users?
     raise _("A tenant default group can not be deleted") if tenant_group? && referenced_by_tenant?
     raise _("A read only group cannot be deleted.") if system_group?
+  end
+
+  def reset_current_group_for_users
+    User.where(:id => user_ids, :current_group_id => id).each(&:change_current_group)
   end
 end

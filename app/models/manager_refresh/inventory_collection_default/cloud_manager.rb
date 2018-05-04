@@ -37,6 +37,26 @@ class ManagerRefresh::InventoryCollectionDefault::CloudManager < ManagerRefresh:
 
       attributes.merge!(extra_attributes)
     end
+
+    def vm_and_template_labels(extra_attributes = {})
+      # TODO(lsmola) make a generic CustomAttribute IC and move it to base class
+      attributes = {
+        :model_class                  => CustomAttribute,
+        :association                  => :vm_and_template_labels,
+        :manager_ref                  => [:resource, :name],
+        :parent_inventory_collections => [:vms, :miq_templates],
+        :inventory_object_attributes  => [
+          :resource,
+          :section,
+          :name,
+          :value,
+          :source,
+        ]
+      }
+
+      attributes.merge!(extra_attributes)
+    end
+
     def networks(extra_attributes = {})
       attributes = {
         :model_class                  => ::Network,
@@ -44,32 +64,6 @@ class ManagerRefresh::InventoryCollectionDefault::CloudManager < ManagerRefresh:
         :association                  => :networks,
         :parent_inventory_collections => [:vms],
       }
-
-      attributes[:custom_manager_uuid] = lambda do |network|
-        [network.hardware.vm_or_template.ems_ref, network.description]
-      end
-
-      attributes[:custom_db_finder] = lambda do |inventory_collection, selection, _projection|
-        relation = inventory_collection.parent.send(inventory_collection.association)
-                                       .joins(:hardware => :vm_or_template)
-                                       .references(:hardware => :vm_or_template)
-
-        unless selection.blank?
-          vms_ems_refs = selection.map { |x| x[:hardware] }.uniq
-          descriptions = selection.map { |x| x[:description] }.uniq
-
-          relation = relation.where(:hardware => {'vms' => {:ems_ref => vms_ems_refs}})
-          relation = relation.where(:description => descriptions)
-        end
-        relation
-      end
-
-      attributes[:targeted_arel] = lambda do |inventory_collection|
-        manager_uuids = inventory_collection.parent_inventory_collections.flat_map { |c| c.manager_uuids.to_a }
-        inventory_collection.parent.networks.joins(:hardware => :vm_or_template).where(
-          :hardware => {'vms' => {:ems_ref => manager_uuids}}
-        )
-      end
 
       attributes.merge!(extra_attributes)
     end
@@ -94,13 +88,6 @@ class ManagerRefresh::InventoryCollectionDefault::CloudManager < ManagerRefresh:
         :parent_inventory_collections => [:orchestration_stacks]
       }
 
-      extra_attributes[:targeted_arel] = lambda do |inventory_collection|
-        manager_uuids = inventory_collection.parent_inventory_collections.flat_map { |c| c.manager_uuids.to_a }
-        inventory_collection.parent.orchestration_stacks_resources.references(:orchestration_stacks).where(
-          :orchestration_stacks => {:ems_ref => manager_uuids}
-        )
-      end
-
       attributes.merge!(extra_attributes)
     end
 
@@ -111,13 +98,6 @@ class ManagerRefresh::InventoryCollectionDefault::CloudManager < ManagerRefresh:
         :parent_inventory_collections => [:orchestration_stacks],
       }
 
-      extra_attributes[:targeted_arel] = lambda do |inventory_collection|
-        manager_uuids = inventory_collection.parent_inventory_collections.flat_map { |c| c.manager_uuids.to_a }
-        inventory_collection.parent.orchestration_stacks_outputs.references(:orchestration_stacks).where(
-          :orchestration_stacks => {:ems_ref => manager_uuids}
-        )
-      end
-
       attributes.merge!(extra_attributes)
     end
 
@@ -127,13 +107,6 @@ class ManagerRefresh::InventoryCollectionDefault::CloudManager < ManagerRefresh:
         :association                  => :orchestration_stacks_parameters,
         :parent_inventory_collections => [:orchestration_stacks],
       }
-
-      extra_attributes[:targeted_arel] = lambda do |inventory_collection|
-        manager_uuids = inventory_collection.parent_inventory_collections.flat_map { |c| c.manager_uuids.to_a }
-        inventory_collection.parent.orchestration_stacks_parameters.references(:orchestration_stacks).where(
-          :orchestration_stacks => {:ems_ref => manager_uuids}
-        )
-      end
 
       attributes.merge!(extra_attributes)
     end
@@ -153,6 +126,17 @@ class ManagerRefresh::InventoryCollectionDefault::CloudManager < ManagerRefresh:
         :model_class       => ::OrchestrationTemplate,
         :association       => :orchestration_templates,
         :custom_save_block => orchestration_template_save_block
+      }
+
+      attributes.merge!(extra_attributes)
+    end
+
+    def snapshots(extra_attributes = {})
+      attributes = {
+        :model_class                  => ::Snapshot,
+        :association                  => :snapshots,
+        :manager_ref                  => [:vm_or_template, :ems_ref],
+        :parent_inventory_collections => [:vms, :miq_templates],
       }
 
       attributes.merge!(extra_attributes)

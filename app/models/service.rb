@@ -42,7 +42,6 @@ class Service < ApplicationRecord
   virtual_has_many   :power_states, :uses => :all_vms
   virtual_has_many   :orchestration_stacks
   virtual_has_many   :generic_objects
-  virtual_total      :v_total_vms, :vms
 
   virtual_has_one    :custom_actions
   virtual_has_one    :custom_action_buttons
@@ -54,7 +53,6 @@ class Service < ApplicationRecord
   before_validation :set_tenant_from_group
   before_create     :apply_dialog_settings
 
-  delegate :custom_actions, :custom_action_buttons, :to => :service_template, :allow_nil => true
   delegate :provision_dialog, :to => :miq_request, :allow_nil => true
   delegate :user, :to => :miq_request, :allow_nil => true
 
@@ -70,6 +68,9 @@ class Service < ApplicationRecord
   include_concern 'RetirementManagement'
   include_concern 'Aggregation'
   include_concern 'ResourceLinking'
+
+  virtual_total :v_total_vms, :vms,
+                :arel => aggregate_hardware_arel("v_total_vms", vms_tbl[:id].count, :skip_hardware => true)
 
   virtual_column :has_parent,                               :type => :boolean
   virtual_column :power_state,                              :type => :string
@@ -97,6 +98,14 @@ class Service < ApplicationRecord
 
   def power_states
     vms.map(&:power_state)
+  end
+
+  def custom_actions
+    service_template&.custom_actions(self)
+  end
+
+  def custom_action_buttons
+    service_template&.custom_action_buttons(self)
   end
 
   def power_state
@@ -363,11 +372,11 @@ class Service < ApplicationRecord
   end
 
   def chargeback_report_name
-    "Chargeback-Vm-Monthly-#{name}"
+    "Chargeback-Vm-Monthly-#{name}-#{id}"
   end
 
   def generate_chargeback_report(options = {})
-    _log.info("Generation of chargeback report for service #{name} started...")
+    _log.info("Generation of chargeback report for service #{name} with #{id} started...")
     MiqReportResult.where(:name => chargeback_report_name).destroy_all
     report = MiqReport.new(chargeback_yaml)
     options[:report_sync] = true
@@ -383,14 +392,23 @@ class Service < ApplicationRecord
   end
 
   def queue_chargeback_report_generation(options = {})
+    task = MiqTask.create(
+      :name    => "Generating chargeback report with id: #{id}",
+      :state   => MiqTask::STATE_QUEUED,
+      :status  => MiqTask::STATUS_OK,
+      :message => "Queueing Chargeback of #{self.class.name} with id: #{id}"
+    )
+
     MiqQueue.submit_job(
       :service     => "reporting",
       :class_name  => self.class.name,
       :instance_id => id,
+      :task_id     => task.id,
       :method_name => "generate_chargeback_report",
       :args        => options
     )
     _log.info("Added to queue: generate_chargeback_report for service #{name}")
+    task
   end
 
   #
@@ -424,6 +442,9 @@ class Service < ApplicationRecord
   def remove_from_service(parent_service)
     update(:parent => nil)
     parent_service.remove_resource(self)
+  end
+
+  def configuration_script
   end
 
   private

@@ -207,6 +207,19 @@ describe Service do
       expect(@service.all_vms).to    match_array [@vm, @vm1, @vm1, @vm2]
     end
 
+    it "#v_total_vms" do
+      expect(@service.v_total_vms).to eq 4
+      expect(@service.attribute_present?(:v_total_vms)).to eq false
+    end
+
+    it "#v_total_vms with arel" do
+      service = Service.select(:id, :v_total_vms)
+                       .where(:id => @service.id)
+                       .first
+      expect(service.v_total_vms).to eq 4
+      expect(service.attribute_present?(:v_total_vms)).to eq true
+    end
+
     it "#direct_service" do
       expect(@vm.direct_service).to eq(@service)
       expect(@vm1.direct_service).to eq(@service_c1)
@@ -429,7 +442,7 @@ describe Service do
 
     describe "#chargeback_report_name" do
       it "creates chargeback report's name" do
-        expect(@service.chargeback_report_name).to eq "Chargeback-Vm-Monthly-Test_Service_1"
+        expect(@service.chargeback_report_name).to eq "Chargeback-Vm-Monthly-Test_Service_1-#{@service.id}"
       end
     end
 
@@ -440,7 +453,7 @@ describe Service do
                                   :method_name => "generate_chargeback_report",
                                   :args        => {:report_source => "Test Run"})
         end
-        @service.queue_chargeback_report_generation(:report_source => "Test Run")
+        expect(@service.queue_chargeback_report_generation(:report_source => "Test Run")).to be_kind_of(MiqTask)
       end
     end
 
@@ -807,5 +820,28 @@ describe Service do
     @service_c12  = FactoryGirl.create(:service, :service => @service_c1)
     @service_c121 = FactoryGirl.create(:service, :service => @service_c12)
     @service_c2   = FactoryGirl.create(:service, :service => @service)
+  end
+
+  context "custom actions" do
+    let(:service_template) { FactoryGirl.create(:service_template) }
+    let(:service) { FactoryGirl.create(:service, :service_template => service_template) }
+
+    describe "#custom_actions" do
+      it "get list of custom actions from linked service template" do
+        expect(service_template).to receive(:custom_actions)
+        service.custom_actions
+      end
+    end
+
+    describe "#custom_action_buttons" do
+      it "get list of custom action buttons from linked service template" do
+        expect(service_template).to receive(:custom_action_buttons)
+        service.custom_action_buttons
+      end
+    end
+  end
+
+  describe '#configuration_script' do
+    it { expect(subject.configuration_script).to be_nil }
   end
 end

@@ -132,6 +132,10 @@ class ChargebackRate < ApplicationRecord
     get_assigned_tos[:tags].present?
   end
 
+  def default?
+    super || description == 'Default Container Image Rate'
+  end
+
   ###########################################################
 
   private

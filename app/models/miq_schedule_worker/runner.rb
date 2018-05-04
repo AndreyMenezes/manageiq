@@ -54,7 +54,6 @@ class MiqScheduleWorker::Runner < MiqWorker::Runner
     schedules_for_database_operations_role
     schedules_for_ems_metrics_coordinator_role
     schedules_for_event_role
-    schedules_for_ldap_synchronization_role
   end
 
   def load_user_schedules
@@ -204,6 +203,16 @@ class MiqScheduleWorker::Runner < MiqWorker::Runner
       enqueue(:binary_blob_purge_timer)
     end
 
+    every = worker_settings[:notifications_purge_interval]
+    scheduler.schedule_every(every, :first_in => every) do
+      enqueue(:notification_purge_timer)
+    end
+
+    every = worker_settings[:vim_performance_states_purge_interval]
+    scheduler.schedule_every(every, :first_in => every) do
+      enqueue(:vim_performance_states_purge_timer)
+    end
+
     # Schedule every 24 hours
     at = worker_settings[:storage_file_collection_time_utc]
     if Time.now.strftime("%Y-%m-%d #{at}").to_time(:utc) < Time.now.utc
@@ -275,23 +284,21 @@ class MiqScheduleWorker::Runner < MiqWorker::Runner
       :tags => [:database_operations, :database_metrics_purge_schedule],
     ) { enqueue(:metric_purge_all_timer) }
 
-    @schedules[:database_operations]
-  end
-
-  def schedules_for_ldap_synchronization_role
-    # These schedules need to run with the LDAP SYnchronizartion role
-    return unless schedule_enabled?(:ldap_synchronization)
-    scheduler = scheduler_for(:ldap_synchronization)
-
-    sched = ::Settings.ldap_synchronization.ldap_synchronization_schedule
-    _log.info("ldap_synchronization_schedule: #{sched}")
-
+    sched = ::Settings.database.maintenance.reindex_schedule
+    _log.info("database_maintenance_reindex_schedule: #{sched}")
     scheduler.schedule_cron(
       sched,
-      :tags => [:ldap_synchronization, :ldap_synchronization_schedule],
-    ) { enqueue(:ldap_server_sync_data_from_timer) }
+      :tags => %i(database_operations database_maintenance_reindex_schedule),
+    ) { enqueue(:database_maintenance_reindex_timer) }
 
-    @schedules[:ldap_synchronization]
+    sched = ::Settings.database.maintenance.vacuum_schedule
+    _log.info("database_maintenance_vacuum_schedule: #{sched}")
+    scheduler.schedule_cron(
+      sched,
+      :tags => %i(database_operations database_maintenance_vacuum_schedule),
+    ) { enqueue(:database_maintenance_vacuum_timer) }
+
+    @schedules[:database_operations]
   end
 
   def schedules_for_ems_metrics_coordinator_role

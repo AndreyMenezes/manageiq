@@ -5,7 +5,6 @@ module EmsRefresh
   extend EmsRefresh::SaveInventoryInfra
   extend EmsRefresh::SaveInventoryPhysicalInfra
   extend EmsRefresh::SaveInventoryContainer
-  extend EmsRefresh::SaveInventoryDatawarehouse
   extend EmsRefresh::SaveInventoryNetwork
   extend EmsRefresh::SaveInventoryObjectStorage
   extend EmsRefresh::SaveInventoryHelper
@@ -174,7 +173,7 @@ module EmsRefresh
     # Items will be naturally serialized since there is a dedicated worker.
     MiqQueue.put_or_update(queue_options) do |msg, item|
       targets = msg.nil? ? targets : msg.data.concat(targets)
-      targets.uniq! if targets.size > 1_000
+      targets = uniq_targets(targets)
 
       # If we are merging with an existing queue item we don't need a new
       # task, just use the original one
@@ -196,6 +195,7 @@ module EmsRefresh
       item.merge(
         :data        => targets,
         :task_id     => task_id,
+        :miq_task_id => task_id,
         :msg_timeout => queue_timeout
       )
     end
@@ -204,6 +204,7 @@ module EmsRefresh
   end
 
   def self.create_refresh_task(ems, targets)
+    targets = targets.collect { |target_class, target_id| [target_class.demodulize, target_id] }
     task_options = {
       :action => "EmsRefresh(#{ems.name}) [#{targets}]".truncate(255),
       :userid => "system"
@@ -217,7 +218,21 @@ module EmsRefresh
       :message => "Queued the action: [#{task_options[:action]}] being run for user: [#{task_options[:userid]}]"
     )
   end
+
   private_class_method :create_refresh_task
+
+  def self.uniq_targets(targets)
+    if targets.size > 1_000
+      manager_refresh_targets, application_record_targets = targets.partition { |key, _| key == "ManagerRefresh::Target" }
+      application_record_targets.uniq!
+      manager_refresh_targets.uniq! { |_, value| value.values_at(:manager_id, :association, :manager_ref) }
+
+      application_record_targets + manager_refresh_targets
+    else
+      targets
+    end
+  end
+  private_class_method :uniq_targets
 
   #
   # Helper methods for advanced debugging

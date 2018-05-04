@@ -23,6 +23,8 @@ class EmbeddedAnsibleWorker::Runner < MiqWorker::Runner
 
   def do_work
     embedded_ansible.start if !embedded_ansible.alive? && !embedded_ansible.running?
+    provider.authentication_check if embedded_ansible.alive? && !provider.authentication_status_ok?
+    update_job_data_retention
   end
 
   def before_exit(*_)
@@ -37,7 +39,6 @@ class EmbeddedAnsibleWorker::Runner < MiqWorker::Runner
 
   def update_embedded_ansible_provider
     server   = MiqServer.my_server(true)
-    provider = ManageIQ::Providers::EmbeddedAnsible::Provider.first_or_initialize
 
     provider.name = "Embedded Ansible"
     provider.zone = server.zone
@@ -65,12 +66,23 @@ class EmbeddedAnsibleWorker::Runner < MiqWorker::Runner
 
   private
 
+  def update_job_data_retention
+    return if @job_data_retention == ::Settings.embedded_ansible.job_data_retention_days
+
+    embedded_ansible.set_job_data_retention
+    @job_data_retention = ::Settings.embedded_ansible.job_data_retention_days
+  end
+
+  def provider
+    @provider ||= ManageIQ::Providers::EmbeddedAnsible::Provider.first_or_initialize
+  end
+
   def provider_url
     URI::Generic.build(provider_uri_hash).to_s
   end
 
   def provider_uri_hash
-    if MiqEnvironment::Command.is_container?
+    if MiqEnvironment::Command.is_podified?
       {:scheme => "https", :host => ContainerEmbeddedAnsible::ANSIBLE_SERVICE_NAME, :path => "/api/v1"}
     elsif Rails.env.development?
       {:scheme => "http", :host => "localhost", :path => "/api/v1", :port => 54321}

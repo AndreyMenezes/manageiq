@@ -406,6 +406,15 @@ describe PglogicalSubscription do
         .with("my.example.com", nil, "root", "thepassword", "vmdb_production")
       sub.validate
     end
+
+    it "validates connection parameters without accessing database or initializing subscription parameters" do
+      sub = described_class.new
+
+      expect(pglogical).not_to receive(:subscription_show_status)
+      expect(MiqRegionRemote).to receive(:validate_connection_settings)
+        .with("my.example.com", nil, "root", "mypass", "vmdb_production")
+      sub.validate('host' => "my.example.com", 'user' => "root", 'password' => "mypass", 'dbname' => "vmdb_production")
+    end
   end
 
   describe "#backlog" do
@@ -422,6 +431,12 @@ describe PglogicalSubscription do
       expect(remote_connection).to receive(:xlog_location).and_return("0/42108F8")
 
       expect(described_class.first.backlog).to eq(12_120)
+    end
+
+    it "returns nill if error raised inside" do
+      expect(MiqRegionRemote).to receive(:with_remote_connection).and_raise(PG::Error)
+
+      expect(described_class.first.backlog).to be nil
     end
   end
 end

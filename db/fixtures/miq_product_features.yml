@@ -999,6 +999,10 @@
       :description: Scale an Infrastructure Provider down
       :feature_type: admin
       :identifier: ems_infra_scaledown
+    - :name: Change Password
+      :description: Change Password of Infrastructure Providers
+      :feature_type: admin
+      :identifier: ems_infra_change_password
 
 # Datacenters
 - :name: Datacenters
@@ -2865,43 +2869,6 @@
           :feature_type: admin
           :hidden: true
           :identifier: zone_delete
-    - :name: LDAP
-      :description: LDAP
-      :feature_type: node
-      :hidden: true
-      :identifier: ldap
-      :children:
-      - :name: Modify
-        :description: Modify a LDAP
-        :feature_type: admin
-        :identifier: ldap_admin
-        :hidden: true
-        :children:
-        - :name: Add
-          :description: Add a LDAP domain
-          :feature_type: admin
-          :hidden: true
-          :identifier: ldap_domain_add
-        - :name: Edit
-          :description: Edit a LDAP domain
-          :feature_type: admin
-          :hidden: true
-          :identifier: ldap_domain_edit
-        - :name: Delete
-          :description: Delete a LDAP domain
-          :feature_type: admin
-          :hidden: true
-          :identifier: ldap_domain_delete
-        - :name: Edit
-          :description: Edit a LDAP region
-          :feature_type: admin
-          :hidden: true
-          :identifier: ldap_region_edit
-        - :name: Delete
-          :description: Delete a LDAP region
-          :feature_type: admin
-          :hidden: true
-          :identifier: ldap_region_delete
     - :name: Regions
       :description: Regions
       :feature_type: node
@@ -3768,469 +3735,6 @@
       :feature_type: admin
       :identifier: ems_container_deployment
 
-# EmsMiddleware
-- :name: Providers
-  :description: Everything under Middleware Providers
-  :feature_type: node
-  :identifier: ems_middleware
-  :children:
-  - :name: View
-    :description: View Middleware Providers
-    :feature_type: view
-    :identifier: ems_middleware_view
-    :children:
-    - :name: List
-      :description: Display Lists of Middleware Providers
-      :feature_type: view
-      :identifier: ems_middleware_show_list
-    - :name: Show
-      :description: Display Individual Middleware Providers
-      :feature_type: view
-      :identifier: ems_middleware_show
-    - :name: Timeline
-      :description: Display Timelines for Middleware Providers
-      :feature_type: view
-      :identifier: ems_middleware_timeline
-  - :name: Operate
-    :description: Perform Operations on Middleware Providers
-    :feature_type: control
-    :identifier: ems_middleware_control
-    :children:
-    - :name: Refresh
-      :description: Refresh Middleware Providers
-      :feature_type: control
-      :identifier: ems_middleware_refresh
-    - :name: Re-check Authentication Status
-      :description: Re-check Authentication Status of Middleware Providers
-      :feature_type: control
-      :identifier: ems_middleware_recheck_auth_status
-    - :name: Edit Tags
-      :description: Edit Tags of Middleware Providers
-      :feature_type: control
-      :identifier: ems_middleware_tag
-  - :name: Modify
-    :description: Modify Middleware Providers
-    :feature_type: admin
-    :identifier: ems_middleware_admin
-    :children:
-    - :name: Remove
-      :description: Remove Middleware Providers
-      :feature_type: admin
-      :identifier: ems_middleware_delete
-    - :name: Edit
-      :description: Edit a Middleware Provider
-      :feature_type: admin
-      :identifier: ems_middleware_edit
-    - :name: Add
-      :description: Add a Middleware Provider
-      :feature_type: admin
-      :identifier: ems_middleware_new
-
-# Middleware Topology
-- :name: Middleware Topology
-  :description: Middleware Topology
-  :feature_type: node
-  :identifier: middleware_topology
-  :children:
-  - :name: View
-    :description: View Middleware Topology
-    :feature_type: view
-    :identifier: middleware_topology_view
-
-# MiddlewareServer
-- :name: Middleware Server
-  :description: Everything under Middleware Servers
-  :feature_type: node
-  :identifier: middleware_server
-  :children:
-  - :name: View
-    :description: View Middleware Servers
-    :feature_type: view
-    :identifier: middleware_server_view
-    :children:
-    - :name: List
-      :description: Display Lists of Middleware Servers
-      :feature_type: view
-      :identifier: middleware_server_show_list
-    - :name: Show
-      :description: Display Individual Middleware Servers
-      :feature_type: view
-      :identifier: middleware_server_show
-    - :name: Timeline
-      :description: Display Timelines for Middleware Servers
-      :feature_type: view
-      :identifier: middleware_server_timeline
-    - :name: Utilization
-      :description: Show Capacity & Utilization data of Middleware Servers
-      :feature_type: view
-      :identifier: middleware_server_perf
-  - :name: Operate
-    :description: Perform Operations on Middleware Servers
-    :feature_type: control
-    :identifier: middleware_server_control
-    :children:
-    - :name: Manage Policies
-      :description: Manage Policies of Middleware Servers
-      :feature_type: control
-      :identifier: middleware_server_protect
-    - :name: Edit Tags
-      :description: Edit Tags of Middleware Servers
-      :feature_type: control
-      :identifier: middleware_server_tag
-    - :name: Reload middleware server
-      :description: Trigger reload operation for Middleware Server
-      :feature_type: admin
-      :identifier: middleware_server_reload
-    - :name: Stop middleware server
-      :description: Stop Middleware Server
-      :feature_type: admin
-      :identifier: middleware_server_stop
-    - :name: Stop middleware server in domain
-      :description: Stop Middleware Server in Domain
-      :feature_type: admin
-      :identifier: middleware_domain_server_stop
-    - :name: Start middleware server in domain
-      :description: Start Middleware Server in Domain
-      :feature_type: admin
-      :identifier: middleware_domain_server_start
-    - :name: Kill middleware server in domain
-      :description: Kill Middleware Server in Domain
-      :feature_type: admin
-      :identifier: middleware_domain_server_kill
-    - :name: Shut down middleware server
-      :description: Shut Middleware Server down
-      :feature_type: admin
-      :identifier: middleware_server_shutdown
-    - :name: Suspend middleware server
-      :description: Suspend Middleware Server
-      :feature_type: admin
-      :identifier: middleware_server_suspend
-    - :name: Resume middleware server
-      :description: Resume a suspended Middleware Server
-      :feature_type: admin
-      :identifier: middleware_server_resume
-    - :name: Restart middleware server
-      :description: Restart a Middleware Server
-      :feature_type: admin
-      :identifier: middleware_server_restart
-    - :name: Restart middleware server in domain
-      :description: Restart a Middleware Server in Domain
-      :feature_type: admin
-      :identifier: middleware_domain_server_restart
-    - :name: Add middleware deployment
-      :description: Add middleware deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_add
-    - :name: Add middleware jdbc driver
-      :description: Add middleware jdbc driver
-      :feature_type: admin
-      :identifier: middleware_jdbc_driver_add
-    - :name: Add middleware datasource
-      :description: Add middleware datasource
-      :feature_type: admin
-      :identifier: middleware_datasource_add
-    - :name: Generate JDR report
-      :description: Generate JDR report for a Middleware Server
-      :feature_type: admin
-      :identifier: middleware_dr_generate
-    - :name: Delete JDR reports
-      :description: Delete JDR reports for a Middleware Server
-      :feature_type: admin
-      :identifier: middleware_dr_delete
-
-# MiddlewareDeployment
-- :name: Middleware Deployment
-  :description: Everything under Middleware Deployments
-  :feature_type: node
-  :identifier: middleware_deployment
-  :children:
-  - :name: View
-    :description: View Middleware Deployments
-    :feature_type: view
-    :identifier: middleware_deployment_view
-    :children:
-    - :name: List
-      :description: Display Lists of Middleware Deployments
-      :feature_type: view
-      :identifier: middleware_deployment_show_list
-    - :name: Show
-      :description: Display Individual Middleware Deployments
-      :feature_type: view
-      :identifier: middleware_deployment_show
-  - :name: Modify
-    :description: Modify Middleware Deployments
-    :feature_type: admin
-    :identifier: middleware_deployment_admin
-    :children:
-    - :name: Undeploy
-      :description: Undeploy Middleware Deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_remove
-    - :name: Edit
-      :description: Edit a Middleware Deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_edit
-    - :name: Add
-      :description: Add a Middleware Deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_new
-  - :name: Operate
-    :description: Perform Operations on Middleware Deployments
-    :feature_type: control
-    :identifier: middleware_deployment_control
-    :children:
-    - :name: Edit Tags
-      :description: Edit Tags of Middleware Deployments
-      :feature_type: control
-      :identifier: middleware_deployment_tag
-    - :name: Disable middleware deployment
-      :description: Disable Middleware deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_disable
-    - :name: Enable middleware deployment
-      :description: Enable Middleware deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_enable
-    - :name: Undeploy middleware deployment
-      :description: Undeploy Middleware deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_undeploy
-    - :name: Restart middleware deployment
-      :description: Restart Middleware deployment
-      :feature_type: admin
-      :identifier: middleware_deployment_restart
-
-# Middleware Datasource
-- :name: Middleware Datasource
-  :description: Everything under Middleware Datasources
-  :feature_type: node
-  :identifier: middleware_datasource
-  :children:
-  - :name: View
-    :description: View Middleware Datasources
-    :feature_type: view
-    :identifier: middleware_datasource_view
-    :children:
-    - :name: List
-      :description: Display Lists of Middleware Datasources
-      :feature_type: view
-      :identifier: middleware_datasource_show_list
-    - :name: Show
-      :description: Display Individual Middleware Datasources
-      :feature_type: view
-      :identifier: middleware_datasource_show
-    - :name: Utilization
-      :description: Show Capacity & Utilization data of Middleware DataSources
-      :feature_type: view
-      :identifier: middleware_datasource_perf
-  - :name: Modify
-    :description: Modify Middleware Datasources
-    :feature_type: admin
-    :identifier: middleware_datasource_admin
-    :children:
-    - :name: Remove
-      :description: Remove Middleware Datasource
-      :feature_type: admin
-      :identifier: middleware_datasource_remove
-    - :name: Edit
-      :description: Edit a Middleware Datasource
-      :feature_type: admin
-      :identifier: middleware_datasource_edit
-    - :name: Add
-      :description: Add a Middleware Datasource
-      :feature_type: admin
-      :identifier: middleware_datasource_new
-  - :name: Operate
-    :description: Perform Operations on Middleware Datasources
-    :feature_type: control
-    :identifier: middleware_datasource_control
-    :children:
-    - :name: Edit Tags
-      :description: Edit Tags of Middleware Datasources
-      :feature_type: control
-      :identifier: middleware_datasource_tag
-
-# Middleware Domain
-- :name: Middleware Domain
-  :description: Everything under Middleware Domain
-  :feature_type: node
-  :identifier: middleware_domain
-  :children:
-  - :name: View
-    :description: View Middleware Domains
-    :feature_type: view
-    :identifier: middleware_domain_view
-    :children:
-    - :name: List
-      :description: Display Lists of Middleware Domains
-      :feature_type: view
-      :identifier: middleware_domain_show_list
-    - :name: Show
-      :description: Display Individual Middleware Domains
-      :feature_type: view
-      :identifier: middleware_domain_show
-  - :name: Operate
-    :description: Perform Operations on Middleware Domains
-    :feature_type: control
-    :identifier: middleware_domain_control
-    :children:
-    - :name: Edit Tags
-      :description: Edit Tags of Middleware Domains
-      :feature_type: control
-      :identifier: middleware_domain_tag
-    - :name: Stop Middleware Domain
-      :description: Stop Middleware Domain
-      :feature_type: control
-      :identifier: middleware_domain_stop
-
-# Middleware Server Group
-- :name: Middleware Server Group
-  :description: Everything under Middleware Server Group
-  :feature_type: node
-  :identifier: middleware_server_group
-  :children:
-  - :name: View
-    :description: View Middleware Server Groups
-    :feature_type: view
-    :identifier: middleware_server_group_view
-    :children:
-    - :name: List
-      :description: Display Lists of Middleware Server Groups
-      :feature_type: view
-      :identifier: middleware_server_group_show_list
-    - :name: Show
-      :description: Display Individual Middleware Server Groups
-      :feature_type: view
-      :identifier: middleware_server_group_show
-  - :name: Operate
-    :description: Perform Operations on Middleware Server Groups
-    :feature_type: control
-    :identifier: middleware_server_group_control
-    :children:
-    - :name: Edit Tags
-      :description: Edit Tags of Middleware Server Groups
-      :feature_type: control
-      :identifier: middleware_server_group_tag
-    - :name: Reload middleware server group
-      :description: Trigger reload operation for Middleware Server Group
-      :feature_type: admin
-      :identifier: middleware_server_group_reload
-    - :name: Stop middleware server group
-      :description: Stop Middleware Server Group
-      :feature_type: admin
-      :identifier: middleware_server_group_stop
-    - :name: Start middleware server group
-      :description: Start Middleware Server Group
-      :feature_type: admin
-      :identifier: middleware_server_group_start
-    - :name: Suspend middleware server group
-      :description: Suspend Middleware Server Group
-      :feature_type: admin
-      :identifier: middleware_server_group_suspend
-    - :name: Resume middleware server group
-      :description: Resume a suspended Middleware Server Group
-      :feature_type: admin
-      :identifier: middleware_server_group_resume
-    - :name: Restart middleware server group
-      :description: Restart a Middleware Server Group
-      :feature_type: admin
-      :identifier: middleware_server_group_restart
-    - :name: Add middleware deployment
-      :description: Add middleware deployment for Server Group
-      :feature_type: admin
-      :identifier: middleware_group_deployment_add
-
-# Middleware Messaging
-- :name: Middleware Messaging
-  :description: Everything under Middleware Messaging
-  :feature_type: node
-  :identifier: middleware_messaging
-  :children:
-  - :name: View
-    :description: View Middleware Messaging
-    :feature_type: view
-    :identifier: middleware_messaging_view
-    :children:
-    - :name: List
-      :description: Display Lists of Middleware Messaging
-      :feature_type: view
-      :identifier: middleware_messaging_show_list
-    - :name: Show
-      :description: Display Individual Middleware Messaging
-      :feature_type: view
-      :identifier: middleware_messaging_show
-    - :name: Utilization
-      :description: Show Capacity & Utilization data of Middleware Messaging
-      :feature_type: view
-      :identifier: middleware_messaging_perf
-  - :name: Operate
-    :description: Perform Operations on Middleware Messaging
-    :feature_type: control
-    :identifier: middleware_messaging_control
-    :children:
-    - :name: Edit Tags
-      :description: Edit Tags of Middleware Messaging
-      :feature_type: control
-      :identifier: middleware_messaging_tag
-
-# EmsDatawarehouse
-- :name: Providers
-  :description: Everything under Datawarehouse Providers
-  :feature_type: node
-  :identifier: ems_datawarehouse
-  :children:
-  - :name: View
-    :description: View Datawarehouse Providers
-    :feature_type: view
-    :identifier: ems_datawarehouse_view
-    :children:
-    - :name: List
-      :description: Display Lists of Datawarehouse Providers
-      :feature_type: view
-      :identifier: ems_datawarehouse_show_list
-    - :name: Show
-      :description: Display Individual Datawarehouse Providers
-      :feature_type: view
-      :identifier: ems_datawarehouse _show
-    - :name: Timeline
-      :description: Display Timelines for Datawarehouse Providers
-      :feature_type: view
-      :identifier: ems_datawarehouse_timeline
-  - :name: Operate
-    :description: Perform Operations on Datawarehouse Providers
-    :feature_type: control
-    :identifier: ems_datawarehouse_control
-    :children:
-    - :name: Refresh
-      :description: Refresh Datawarehouse Providers
-      :feature_type: control
-      :identifier: ems_datawarehouse_refresh
-    - :name: Re-check Authentication Status
-      :description: Re-check Authentication Status of Datawarehouse Providers
-      :feature_type: control
-      :identifier: ems_datawarehouse_recheck_auth_status
-    - :name: Edit Tags
-      :description: Edit Tags of Datawarehouse Providers
-      :feature_type: control
-      :identifier: ems_datawarehouse_tag
-  - :name: Modify
-    :description: Modify Datawarehouse Providers
-    :feature_type: admin
-    :identifier: ems_datawarehouse_admin
-    :children:
-    - :name: Remove
-      :description: Remove Datawarehouse Providers
-      :feature_type: admin
-      :identifier: ems_datawarehouse_delete
-    - :name: Edit
-      :description: Edit a Datawarehouse Provider
-      :feature_type: admin
-      :identifier: ems_datawarehouse_edit
-    - :name: Add
-      :description: Add a Datawarehouse Provider
-      :feature_type: admin
-      :identifier: ems_datawarehouse_new
-
 # EmsNetwork
 - :name: Network Providers
   :description: Everything under Network Providers
@@ -5048,6 +4552,10 @@
         :description: Display Lists of Containers
         :feature_type: view
         :identifier: container_show_list
+      - :name: Show
+        :description: Display Individual Containers
+        :feature_type: view
+        :identifier: container_show
       - :name: Timeline
         :description: Display Timelines for Containers
         :feature_type: view
@@ -5238,6 +4746,10 @@
         :description: Ansible Repositories Refresh
         :feature_type: control
         :identifier: embedded_configuration_script_source_refresh
+      - :name: Edit Tags
+        :description: Edit Tags for the selected Ansible Repositories
+        :feature_type: control
+        :identifier: ansible_repository_tag
   - :name: Playbooks
     :description: Everything under Playbooks
     :feature_type: node
@@ -5264,6 +4776,10 @@
         :description: Ansible Playbooks Refresh
         :feature_type: control
         :identifier: embedded_configuration_script_payload_refresh
+      - :name: Edit Tags
+        :description: Edit Tags for the selected Ansible Playbooks
+        :feature_type: control
+        :identifier: embedded_configuration_script_payload_tag
 
   - :name: Credentials
     :description: Everything under Credentials
@@ -5295,6 +4811,10 @@
         :description: Ansible Credentials Refresh
         :feature_type: control
         :identifier: embedded_automation_manager_credentials_refresh
+      - :name: Edit Tags
+        :description: Edit Tags for the selected Ansible Credentials
+        :feature_type: control
+        :identifier: ansible_credential_tag
 
 # Automation Manager
 - :name: Ansible Tower
@@ -5711,6 +5231,10 @@
         :description: Edit Image Tags
         :feature_type: control
         :identifier: image_tag
+      - :name: Add Image
+        :description: Add Image
+        :feature_type: control
+        :identifier: image_create
     - :name: Modify
       :description: Modify Images
       :feature_type: admin
@@ -6088,17 +5612,6 @@
           :feature_type: control
           :identifier: miq_template_snapshot_revert
 
-# CloudNetworks
-- :name: Cloud Networks
-  :description: Get Cloud Networks
-  :feature_type: node
-  :identifier: miq_cloud_networks
-  :children:
-  - :name: View
-    :description: Show Cloud Networks
-    :feature_type: view
-    :identifier: miq_cloud_networks_view
-
 # EmsStorage
 - :name: Storage Managers
   :description: Everything under Storage Managers
@@ -6335,6 +5848,35 @@
       :feature_type: admin
       :identifier: ems_physical_infra_new
 
+# Physical Switches
+- :name: Physical Switches
+  :description: Everything under Physical Switches
+  :feature_type: node
+  :identifier: physical_switch
+  :children:
+  - :name: View
+    :description: View Physical Switch
+    :feature_type: view
+    :identifier: physical_switch_view
+    :children:
+    - :name: List
+      :description: Display Lists of Physical Switches
+      :feature_type: view
+      :identifier: physical_switch_show_list
+    - :name: Show
+      :description: Display Individual Physical Switch
+      :feature_type: view
+      :identifier: physical_switch_show
+  - :name: Operate
+    :description: Perform Operations on Physical Switches
+    :feature_type: control
+    :identifier: physical_switch_control
+    :children:
+    - :name: Refresh
+      :description: Refresh relationships and power states for all items related to Physical Switches / Nodes
+      :feature_type: control
+      :identifier: physical_switch_refresh
+
 # Physical Servers
 - :name: Physical Servers
   :description: Everything under Physical Servers
@@ -6436,7 +5978,10 @@
       :description: Provision Physical Server
       :feature_type: control
       :identifier: physical_server_provision
-
+    - :name: Physical Server Remote Console
+      :description: Access Physical Server Remote Console
+      :feature_type: control
+      :identifier: physical_server_remote_console
 # Firmwares
 - :name: Firmwares
   :description: Everything under Firmware
@@ -6527,6 +6072,43 @@
     :feature_type: view
     :identifier: monitor_alerts_most_recent
 
+# Transformation Mappings
+- :name: Transformation Mappings
+  :description: Everything under Transformation Mappings
+  :feature_type: node
+  :identifier: transformation_mapping
+  :children:
+  - :name: View
+    :description: View Transformation Mapping
+    :feature_type: view
+    :identifier: transformation_mapping_view
+    :children:
+    - :name: List
+      :description: Display Lists of Transformation Mappings
+      :feature_type: view
+      :identifier: transformation_mapping_show_list
+    - :name: Show
+      :description: Display Individual Transformation Mappings
+      :feature_type: view
+      :identifier: transformation_mapping_show
+  - :name: Modify
+    :description: Modify Transformation Mappings
+    :feature_type: admin
+    :identifier: transformation_mappings_admin
+    :children:
+    - :name: Create Transformation Mapping
+      :description: Create Transformation Mapping
+      :identifier: transformation_mapping_new
+      :feature_type: admin
+    - :name: Edit Transformation Mapping
+      :description: Edit Transformation Mapping
+      :identifier: transformation_mapping_edit
+      :feature_type: admin
+    - :name: Delete Transformation Mapping
+      :description: Delete Transformation Mapping
+      :identifier: transformation_mapping_delete
+      :feature_type: admin
+
 # API
 - :name: API
   :description: Features Exclusive to the API
@@ -6542,6 +6124,10 @@
       :description: View Metrics
       :feature_type: view
       :identifier: metrics_view
+  - :name: Apply Config Pattern
+    :description: Apply Config Pattern
+    :feature_type: control
+    :identifier: physical_server_apply_config_pattern
   - :name: Event Streams
     :description: Everything under Event Streams
     :feature_type: node

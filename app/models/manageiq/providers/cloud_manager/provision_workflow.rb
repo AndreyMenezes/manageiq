@@ -27,13 +27,13 @@ class ManageIQ::Providers::CloudManager::ProvisionWorkflow < ::MiqProvisionVirtW
 
   def allowed_cloud_networks(_options = {})
     return {} unless (src = provider_or_tenant_object)
-    targets = get_targets_for_source(src, :cloud_filter, CloudNetwork, 'cloud_networks')
+    targets = get_targets_for_source(src, :cloud_filter, CloudNetwork, 'all_cloud_networks')
     allowed_ci(:cloud_network, [:availability_zone], targets.map(&:id))
   end
 
   def allowed_guest_access_key_pairs(_options = {})
     source = load_ar_obj(get_source_vm)
-    targets = get_targets_for_ems(source, :cloud_filter, ManageIQ::Providers, 'key_pairs')
+    targets = get_targets_for_ems(source, :cloud_filter, ManageIQ::Providers::CloudManager::AuthKeyPair, 'key_pairs')
     targets.each_with_object({}) { |kp, h| h[kp.id] = kp.name }
   end
 
@@ -88,15 +88,19 @@ class ManageIQ::Providers::CloudManager::ProvisionWorkflow < ::MiqProvisionVirtW
     super(ci, relats, sources, filtered_ids)
   end
 
+  def cloud_network_display_name(cn)
+    cn.cidr.blank? ? cn.name : "#{cn.name} (#{cn.cidr})"
+  end
+
   def availability_zone_to_cloud_network(src)
     if src[:availability_zone]
       load_ar_obj(src[:availability_zone]).cloud_subnets.each_with_object({}) do |cs, hash|
         cn = cs.cloud_network
-        hash[cn.id] = cn.name
+        hash[cn.id] = cloud_network_display_name(cn)
       end
     else
-      load_ar_obj(src[:ems]).cloud_subnets.collect(&:cloud_network).each_with_object({}) do |cn, hash|
-        hash[cn.id] = cn.name
+      load_ar_obj(src[:ems]).all_cloud_networks.each_with_object({}) do |cn, hash|
+        hash[cn.id] = cloud_network_display_name(cn)
       end
     end
   end

@@ -34,6 +34,8 @@ class EmsCluster < ApplicationRecord
 
   virtual_has_many :storages,       :uses => {:hosts => :storages}
   virtual_has_many :resource_pools, :uses => :all_relationships
+  virtual_has_many :lans,           :uses => {:hosts => :lans}
+
   has_many :failover_hosts, -> { failover }, :class_name => "Host"
 
   include SerializedEmsRefObjMixin
@@ -207,7 +209,7 @@ class EmsCluster < ApplicationRecord
     EmsEvent.where(ewc).order("timestamp").to_a
   end
 
-  def scan
+  def scan(_userid = "system")
     MiqQueue.submit_job(
       :service     => "smartstate",
       :affinity    => ext_management_system,

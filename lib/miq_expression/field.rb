@@ -40,7 +40,7 @@ class MiqExpression::Field < MiqExpression::Target
   end
 
   def attribute_supported_by_sql?
-    !custom_attribute_column? && target.attribute_supported_by_sql?(column)
+    !custom_attribute_column? && target.attribute_supported_by_sql?(column) && reflection_supported_by_sql?
   end
 
   def custom_attribute_column?
@@ -65,6 +65,29 @@ class MiqExpression::Field < MiqExpression::Target
 
   def report_column
     (associations + [column]).join('.')
+  end
+
+  # this should only be accessed in MiqExpression
+  # please avoid using it
+  def arel_table
+    if associations.none?
+      model.arel_table
+    else
+      # if we are pointing to a table that already in the query, need to alias it
+      # seems we should be able to ask AR to do this for us...
+      ref = reflections.last
+      if ref.klass.table_name == model.table_name
+        ref.klass.arel_table.alias(ref.alias_candidate(model.table_name))
+      else
+        ref.klass.arel_table
+      end
+    end
+  end
+
+  # this should only be accessed in MiqExpression
+  # please avoid using it
+  def arel_attribute
+    target.arel_attribute(column, arel_table) if target
   end
 
   private

@@ -31,7 +31,7 @@ class ContainerNode < ApplicationRecord
   has_many :metrics, :as => :resource
   has_many :metric_rollups, :as => :resource
   has_many :vim_performance_states, :as => :resource
-  has_many :miq_alert_statuses, :as => :resource, :dependent => :destroy
+  has_many :miq_alert_statuses, :as => :resource
 
   virtual_column :ready_condition_status, :type => :string, :uses => :container_conditions
   virtual_column :system_distribution, :type => :string
@@ -81,14 +81,13 @@ class ContainerNode < ApplicationRecord
   end
 
   def cockpit_url
-    URI::HTTP.build(:host => kubernetes_hostname, :port => 9090)
     address = kubernetes_hostname || name
     MiqCockpit::WS.url(cockpit_server, cockpit_worker, address)
   end
 
   def evaluate_alert(_alert_id, _event)
-    # currently only EmsEvents from hawkular are tested for node alerts,
-    # and these should automaticaly be translated to alerts.
+    # This is a no-op on container node, and used to be implemented only for
+    # Hawkular-generated EmsEvents.
     true
   end
 

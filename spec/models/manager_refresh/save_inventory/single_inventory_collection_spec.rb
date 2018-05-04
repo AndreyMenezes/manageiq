@@ -1,5 +1,5 @@
 require_relative 'spec_helper'
-require_relative 'spec_parsed_data'
+require_relative '../helpers/spec_parsed_data'
 
 describe ManagerRefresh::SaveInventory do
   include SpecHelper
@@ -452,7 +452,7 @@ describe ManagerRefresh::SaveInventory do
               :parent               => @ems,
               :association          => :vms,
               # TODO(lsmola) vendor is not getting caught by fixed attributes
-              :attributes_whitelist => [:uid_ems, :vendor, :ext_management_system]
+              :attributes_whitelist => [:uid_ems, :vendor, :ext_management_system, :ems_id]
             )
 
             # Fill the InventoryCollections with data, that have a modified name, new VM and a missing VM
@@ -493,7 +493,7 @@ describe ManagerRefresh::SaveInventory do
               :parent               => @ems,
               :association          => :vms,
               # TODO(lsmola) vendor is not getting caught by fixed attributes
-              :attributes_whitelist => [:uid_ems, :raw_power_state, :vendor, :ext_management_system],
+              :attributes_whitelist => [:uid_ems, :raw_power_state, :vendor, :ems_id, :ext_management_system],
               :attributes_blacklist => [:name, :ems_ref, :raw_power_state]
             )
 
@@ -711,7 +711,7 @@ describe ManagerRefresh::SaveInventory do
             vms_custom_reconnect_block = lambda do |inventory_collection, inventory_objects_index, attributes_index|
               inventory_objects_index.each_slice(1000) do |batch|
                 Vm.where(:ems_ref => batch.map(&:second).map(&:manager_uuid)).each do |record|
-                  index = inventory_collection.object_index_with_keys(inventory_collection.manager_ref_to_cols, record)
+                  index = inventory_collection.build_stringified_reference_for_record(record, inventory_collection.manager_ref_to_cols)
 
                   # We need to delete the record from the inventory_objects_index and attributes_index, otherwise it
                   # would be sent for create.

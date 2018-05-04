@@ -89,7 +89,6 @@ class EmsEvent < EventStream
     process_availability_zone_in_event!(event_hash)
     process_cluster_in_event!(event_hash)
     process_container_entities_in_event!(event_hash)
-    process_middleware_entities_in_event!(event_hash)
 
     # Write the event
     new_event = create_event(event_hash)
@@ -119,13 +118,11 @@ class EmsEvent < EventStream
   def self.process_vm_in_event!(event, options = {})
     prefix           = options[:prefix]
     options[:id_key] = "#{prefix}vm_or_template_id".to_sym
+    uid_ems          = event.delete(:vm_uid_ems)
     process_object_in_event!(Vm, event, options)
 
     if options[:id_key] == :vm_or_template_id && event[:vm_or_template_id].nil?
-      # uid_ems is used for non-VC events, and should be nil for VC events.
-      uid_ems = event.fetch_path(:full_data, :vm, :uid_ems)
-      vm      = VmOrTemplate.find_by(:uid_ems => uid_ems) unless uid_ems.nil?
-
+      vm = VmOrTemplate.find_by(:uid_ems => uid_ems) unless uid_ems.nil?
       unless vm.nil?
         event[:vm_or_template_id] = vm.id
         event[:vm_name] ||= vm.name
@@ -141,17 +138,6 @@ class EmsEvent < EventStream
     [ContainerNode, ContainerGroup, ContainerReplicator].each do |entity|
       process_object_in_event!(entity, event)
     end
-  end
-
-  def self.process_middleware_entities_in_event!(event, _options = {})
-    middleware_type = event[:middleware_type]
-    if middleware_type
-      klass = middleware_type.safe_constantize
-      unless klass.nil?
-        process_object_in_event!(klass, event, :ems_ref_key => :middleware_ref)
-      end
-    end
-    event.except!(:middleware_ref, :middleware_type)
   end
 
   def self.process_availability_zone_in_event!(event, options = {})
@@ -221,7 +207,6 @@ class EmsEvent < EventStream
 
     target_type = "src_vm_or_template"  if target_type == "src_vm"
     target_type = "dest_vm_or_template" if target_type == "dest_vm"
-    target_type = "middleware_server"   if event.event_type == "hawkular_alert"
     target_type = "target"              if event.event_type == "datawarehouse_alert"
 
     event.send(target_type)
@@ -237,8 +222,13 @@ class EmsEvent < EventStream
 
   private
 
+  def self.event_allowed_ems_ref_keys
+    %w(vm_ems_ref dest_vm_ems_ref)
+  end
+  private_class_method :event_allowed_ems_ref_keys
+
   def self.create_event(event)
-    event.delete_if { |k,| k.to_s.ends_with?("_ems_ref") }
+    event.delete_if { |k,| k.to_s.ends_with?("_ems_ref") && !event_allowed_ems_ref_keys.include?(k.to_s) }
 
     new_event = EmsEvent.create(event) unless EmsEvent.exists?(
       :event_type  => event[:event_type],
@@ -285,6 +275,7 @@ class EmsEvent < EventStream
         :host_id           => source_event.host_id,
         :vm_name           => source_event.vm_name,
         :vm_location       => source_event.vm_location,
+        :vm_ems_ref        => source_event.vm_ems_ref,
         :vm_or_template_id => source_event.vm_or_template_id
       }
       new_event[:username] = event.username unless event.username.blank?
@@ -299,6 +290,7 @@ class EmsEvent < EventStream
           :dest_host_id           => dest_event.host_id,
           :dest_vm_name           => dest_event.send("#{dest_key}vm_name"),
           :dest_vm_location       => dest_event.send("#{dest_key}vm_location"),
+          :dest_vm_ems_ref        => dest_event.send("#{dest_key}vm_ems_ref"),
           :dest_vm_or_template_id => dest_event.send("#{dest_key}vm_or_template_id")
         )
       end

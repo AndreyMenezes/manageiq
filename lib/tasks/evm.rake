@@ -50,6 +50,23 @@ namespace :evm do
     EvmApplication.status(true)
   end
 
+  desc "Describe inventory of the ManageIQ EVM Application"
+  task :inventory => :environment do
+    inventory = ExtManagementSystem.inventory_status
+    puts inventory.tableize if inventory.present?
+  end
+
+  desc "Report overview of queue"
+  task :queue => :environment do
+    EvmApplication.queue_overview
+  end
+
+  desc "Determine if the configured encryption key is valid"
+  task :validate_encryption_key => :environment do
+    raise "Invalid encryption key" unless EvmApplication.encryption_key_valid?
+    puts "Encryption key valid"
+  end
+
   desc "Write a remote region id to this server's REGION file"
   task :join_region => :environment do
     configured_region = ApplicationRecord.region_number_from_sequence.to_i

@@ -18,11 +18,6 @@ describe Storage do
     expect(Storage.scan_watchdog_interval).to eq(5.minutes)
   end
 
-  it "#max_parallel_storage_scans_per_host" do
-    stub_settings(:storage => {'max_parallel_scans_per_host' => 3})
-    expect(Storage.max_parallel_storage_scans_per_host).to eq(3)
-  end
-
   it "#max_qitems_per_scan_request" do
     stub_settings(:storage => {'max_qitems_per_scan_request' => 3})
     expect(Storage.max_qitems_per_scan_request).to eq(3)
@@ -70,13 +65,13 @@ describe Storage do
   end
 
   context "with multiple storages" do
-    before(:each) do
+    before do
       @server = EvmSpecHelper.local_miq_server
       @zone   = @server.zone
 
       @zone2     = FactoryGirl.create(:zone, :name => 'Bedrock')
-      @ems1      = FactoryGirl.create(:ems_vmware, :name => "test_vcenter1",     :zone => @zone)
-      @ems2      = FactoryGirl.create(:ems_vmware, :name => "test_vcenter2",     :zone => @zone2)
+      @ems1      = FactoryGirl.create(:ems_vmware_with_valid_authentication, :name => "test_vcenter1",     :zone => @zone)
+      @ems2      = FactoryGirl.create(:ems_vmware_with_authentication,       :name => "test_vcenter2",     :zone => @zone2)
       @storage1  = FactoryGirl.create(:storage,               :name => "test_storage_vmfs", :store_type => "VMFS")
       @storage2  = FactoryGirl.create(:storage,               :name => "test_storage_nfs",  :store_type => "NFS")
       @storage3  = FactoryGirl.create(:storage,               :name => "test_storage_foo",  :store_type => "FOO")
@@ -155,31 +150,16 @@ describe Storage do
       expect(watchdog.deliver_on).to eq(deliver_on)
     end
 
-    context "on a host without credentials" do
+    context "on an ems without credentials" do
       it "#scan will raise error" do
-        expect { @storage1.scan }.to raise_error(MiqException::MiqStorageError)
+        expect { @storage2.scan }.to raise_error(MiqException::MiqStorageError)
       end
     end
 
-    context "on a host authentication status ok" do
-      before(:each) do
+    context "on a host with authentication status ok" do
+      before do
         allow_any_instance_of(Authentication).to receive(:after_authentication_changed)
         FactoryGirl.create(:authentication, :resource => @host1, :status => "Valid")
-      end
-
-      it "#ext_management_systems" do
-        expect(@storage1.ext_management_systems).to eq([@ems1])
-        expect(@storage2.ext_management_systems).to eq([@ems2])
-        expect(@storage3.ext_management_systems).to match_array [@ems1, @ems2]
-      end
-
-      it "#ext_management_systems_in_zone" do
-        expect(@storage1.ext_management_systems_in_zone(@zone.name)).to eq([@ems1])
-        expect(@storage1.ext_management_systems_in_zone(@zone2.name)).to eq([])
-        expect(@storage2.ext_management_systems_in_zone(@zone.name)).to eq([])
-        expect(@storage2.ext_management_systems_in_zone(@zone2.name)).to eq([@ems2])
-        expect(@storage3.ext_management_systems_in_zone(@zone.name)).to eq([@ems1])
-        expect(@storage3.ext_management_systems_in_zone(@zone2.name)).to eq([@ems2])
       end
 
       it "#active_hosts_with_authentication_status_ok" do
@@ -195,6 +175,32 @@ describe Storage do
         expect(@storage2.active_hosts_with_authentication_status_ok_in_zone(@zone2.name)).to eq([])
         expect(@storage3.active_hosts_with_authentication_status_ok_in_zone(@zone.name)).to eq([@host1])
         expect(@storage3.active_hosts_with_authentication_status_ok_in_zone(@zone2.name)).to eq([])
+      end
+    end
+
+    context "on an ems with authentication status ok" do
+      it "#ext_management_systems" do
+        expect(@storage1.ext_management_systems).to eq([@ems1])
+        expect(@storage2.ext_management_systems).to eq([@ems2])
+        expect(@storage3.ext_management_systems).to match_array [@ems1, @ems2]
+      end
+
+      it "#ext_management_systems_in_zone" do
+        expect(@storage1.ext_management_systems_in_zone(@zone.name)).to eq([@ems1])
+        expect(@storage1.ext_management_systems_in_zone(@zone2.name)).to eq([])
+        expect(@storage2.ext_management_systems_in_zone(@zone.name)).to eq([])
+        expect(@storage2.ext_management_systems_in_zone(@zone2.name)).to eq([@ems2])
+        expect(@storage3.ext_management_systems_in_zone(@zone.name)).to eq([@ems1])
+        expect(@storage3.ext_management_systems_in_zone(@zone2.name)).to eq([@ems2])
+      end
+
+      it "#ext_management_systems_with_authentication_status_ok" do
+        expect(@storage1.ext_management_systems_with_authentication_status_ok).to eq([@ems1])
+      end
+
+      it "#ext_management_systems_with_authentication_status_ok_in_zone" do
+        expect(@storage1.ext_management_systems_with_authentication_status_ok_in_zone(@zone.name)).to eq([@ems1])
+        expect(@storage1.ext_management_systems_with_authentication_status_ok_in_zone(@zone2.name)).to eq([])
       end
 
       it "#scan" do
@@ -215,7 +221,7 @@ describe Storage do
       end
 
       context "with performance capture disabled" do
-        before(:each) do
+        before do
           allow_any_instance_of(Storage).to receive_messages(:perf_capture_enabled? => false)
         end
 
@@ -236,7 +242,7 @@ describe Storage do
       end
 
       context "with performance capture enabled" do
-        before(:each) do
+        before do
           allow_any_instance_of(Storage).to receive_messages(:perf_capture_enabled? => true)
           allow(MiqEvent).to receive(:raise_evm_job_event)
         end
@@ -249,7 +255,6 @@ describe Storage do
         end
 
         it "#scan_queue" do
-          allow(Storage).to receive_messages(:max_parallel_storage_scans => 1)
           bogus_id = @storage1.id - 1
           miq_task = FactoryGirl.create(:miq_task)
           miq_task.context_data = {:targets => [], :complete => [], :pending  => {}}
@@ -414,8 +419,9 @@ describe Storage do
 
     it "returns true for VMware Storage when queried whether it supports smartstate analysis" do
       FactoryGirl.create(:host_vmware,
-                         :ext_management_system => FactoryGirl.create(:ems_vmware),
+                         :ext_management_system => FactoryGirl.create(:ems_vmware_with_valid_authentication),
                          :storages              => [@storage])
+
       expect(@storage.supports_smartstate_analysis?).to eq(true)
     end
 
@@ -435,7 +441,7 @@ describe Storage do
 
     it "returns true when queried whether the storage supports smarstate analysis" do
       FactoryGirl.create(:host_vmware,
-                         :ext_management_system => FactoryGirl.create(:ems_vmware),
+                         :ext_management_system => FactoryGirl.create(:ems_vmware_with_valid_authentication),
                          :storages              => [@storage])
       expect(Storage.batch_operation_supported?(:smartstate_analysis, [@storage.id])).to eq(true)
     end
@@ -480,7 +486,7 @@ describe Storage do
 
     it "returns true for VMware Storage when queried whether it supports smartstate analysis" do
       FactoryGirl.create(:host_vmware,
-                         :ext_management_system => FactoryGirl.create(:ems_vmware),
+                         :ext_management_system => FactoryGirl.create(:ems_vmware_with_valid_authentication),
                          :storages              => [@storage])
       expect(@storage.supports_smartstate_analysis?).to eq(true)
     end
@@ -489,17 +495,17 @@ describe Storage do
       expect(@storage.supports_smartstate_analysis?).to_not eq(true)
     end
   end
-  describe "#smartstate_analysis_count_for_host_id" do
+  describe "#smartstate_analysis_count_for_ems_id" do
     it "returns counts" do
       EvmSpecHelper.local_miq_server
-      host = FactoryGirl.create(:host)
+      ems = FactoryGirl.create(:ems_vmware)
       storage = FactoryGirl.create(:storage)
       storage.scan_queue_item(1)
       storage.scan_queue_item(2)
-      MiqQueue.update_all(:target_id => host.id, :state => "dequeue")
+      MiqQueue.update_all(:target_id => ems.id, :state => "dequeue")
       storage.scan_queue_item(3)
 
-      expect(storage.smartstate_analysis_count_for_host_id(host.id)).to eq(2)
+      expect(storage.smartstate_analysis_count_for_ems_id(ems.id)).to eq(2)
     end
   end
 
